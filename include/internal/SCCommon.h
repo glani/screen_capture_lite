@@ -123,5 +123,26 @@ namespace Screen_Capture {
             }
         }
     }
+
+    template <typename F, typename W> struct CaptureDataSync {
+        F OnNewFrame;
+        F OnFrameChanged;
+        W getThingsToWatch;
+    };
+
+    struct Sync_Data {
+        CaptureDataSync<ScreenCaptureCallback, MonitorCallback> ScreenCaptureData;
+    };
+
+
+    class BaseFrameProcessorSync {
+    public:
+        std::shared_ptr<Sync_Data> Data;
+        std::unique_ptr<unsigned char[]> ImageBuffer;
+        int ImageBufferSize = 0;
+        bool FirstRun = true;
+    };
+
+
 } // namespace Screen_Capture
 } // namespace SL

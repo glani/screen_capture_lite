@@ -59,6 +59,10 @@ namespace Screen_Capture {
         unsigned char B, G, R, A;
     };
 
+    struct ImageBGR {
+        unsigned char B, G, R;
+    };
+
     // index to self in the GetMonitors() function
     SC_LITE_EXTERN int Index(const Monitor &mointor);
     // unique identifier
@@ -192,5 +196,26 @@ namespace Screen_Capture {
     // the callback of windowstocapture represents the list of windows which should be captured. Users should return the list of windows they want to
     // be captured
     SC_LITE_EXTERN std::shared_ptr<ICaptureConfiguration<WindowCaptureCallback>> CreateCaptureConfiguration(const WindowCallback &windowstocapture);
+
+    class SC_LITE_EXTERN IScreenCaptureManagerSync {
+    public:
+        virtual ~IScreenCaptureManagerSync() {}
+    };
+
+    template <typename CAPTURECALLBACK> class ICaptureConfigurationSync {
+    public:
+        virtual ~ICaptureConfigurationSync() {}
+        // When a new frame is available the callback is invoked
+        virtual std::shared_ptr<ICaptureConfigurationSync<CAPTURECALLBACK>> onNewFrame(const CAPTURECALLBACK &cb) = 0;
+        // When a change in a frame is detected, the callback is invoked
+        virtual std::shared_ptr<ICaptureConfigurationSync<CAPTURECALLBACK>> onFrameChanged(const CAPTURECALLBACK &cb) = 0;
+        // start capturing
+        virtual std::shared_ptr<IScreenCaptureManagerSync> startCapturing() = 0;
+    };
+
+    // the callback of windowstocapture represents the list of monitors which should be captured. Users should return the list of monitors they want
+    // to be captured
+    SC_LITE_EXTERN std::shared_ptr<ICaptureConfigurationSync<ScreenCaptureCallback>> CreateCaptureConfigurationSync(const MonitorCallback &monitorstocapture);
+
 } // namespace Screen_Capture
 } // namespace SL

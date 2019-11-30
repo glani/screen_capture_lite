@@ -24,6 +24,7 @@ if(WIN32)
 		src/windows/GDIMouseProcessor.cpp
 		include/windows/GDIMouseProcessor.h
 		src/windows/ThreadRunner.cpp
+		src/windows/SyncRunner.cpp
 		include/windows/GDIHelpers.h
     )
     set(SCREEN_CAPTURE_PLATFORM_INC     
@@ -46,6 +47,7 @@ elseif(APPLE)
         include/ios/CGFrameProcessor.h
         src/ios/GetMonitors.cpp
         src/ios/ThreadRunner.cpp
+        src/ios/SyncRunner.cpp
     )
     set(SCREEN_CAPTURE_PLATFORM_INC
        include/ios 
@@ -54,11 +56,14 @@ else()
   set(SCREEN_CAPTURE_PLATFORM_SRC 
        include/linux/X11MouseProcessor.h 
        src/linux/X11MouseProcessor.cpp 
-       include/linux/X11FrameProcessor.h 
+       include/linux/X11FrameProcessor.h
+       include/linux/X11FrameProcessorSync.h
+       src/linux/X11FrameProcessorSync.cpp
        src/linux/X11FrameProcessor.cpp
        src/linux/GetMonitors.cpp
        src/linux/GetWindows.cpp
        src/linux/ThreadRunner.cpp
+       src/linux/SyncRunner.cpp
     )
 	find_package(X11 REQUIRED)
 	if(!X11_XTest_FOUND)
@@ -85,6 +90,7 @@ add_library(${PROJECT_NAME}
 	src/ScreenCapture.cpp 
 	src/SCCommon.cpp 
 	src/ThreadManager.cpp
+	src/SyncManager.cpp
 	${SCREEN_CAPTURE_PLATFORM_SRC}
  )
  if(${BUILD_SHARED_LIBS})	
