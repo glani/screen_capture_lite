@@ -23,7 +23,6 @@ namespace SL {
             void Pause() {}
             void Resume() {}
             DUPL_RETURN Init(std::shared_ptr<Thread_Data> data, Monitor& monitor);
-            DUPL_RETURN InitSync(std::shared_ptr<Sync_Data> data, Monitor& monitor);
             DUPL_RETURN ProcessFrame(const Monitor& currentmonitorinfo);
             DUPL_RETURN Init(std::shared_ptr<Thread_Data> data, const Window& selectedwindow);
             DUPL_RETURN ProcessFrame(Window& selectedwindow);
