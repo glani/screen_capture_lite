@@ -39,6 +39,10 @@ elseif(APPLE)
         include/ios/NSMouseCapture.h 
         src/ios/NSFrameProcessor.cpp
         src/ios/NSFrameProcessor.mm
+        src/ios/NSFrameProcessorSync.cpp
+        src/ios/NSFrameProcessorSync.mm
+		include/ios/NSFrameProcessorSyncm.h
+		include/ios/NSFrameProcessorSync.h
         include/ios/NSFrameProcessorm.h
         include/ios/NSFrameProcessor.h
         src/ios/NSMouseProcessor.cpp
