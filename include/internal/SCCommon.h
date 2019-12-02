@@ -132,6 +132,7 @@ namespace Screen_Capture {
 
     struct Sync_Data {
         CaptureDataSync<ScreenCaptureCallback, MonitorCallback> ScreenCaptureData;
+        DUPL_RETURN lastError;
     };
 
 

@@ -1,18 +1,23 @@
+//
+// Created by deniska on 12/1/2019.
+//
 #include "DXUtilsHolder.h"
-#include "DXFrameProcessor.h"
+#include "DXFrameProcessorSync.h"
 #include "internal/SCCommon.h"
 #include <atomic>
+#include <chrono>
 #include <iostream>
 #include <memory>
 #include <string>
+#include <comdef.h>
 
 
 #if (_MSC_VER >= 1700) && defined(_USING_V110_SDK71_)
 namespace SL {
 namespace Screen_Capture {
 
-    DUPL_RETURN DXFrameProcessor::Init(std::shared_ptr<Thread_Data> data) { return DUPL_RETURN::DUPL_RETURN_ERROR_EXPECTED; }
-    DUPL_RETURN DXFrameProcessor::ProcessFrame() { return DUPL_RETURN::DUPL_RETURN_ERROR_EXPECTED; }
+    DUPL_RETURN DXFrameProcessorSync::Init(std::shared_ptr<Sync_Data> data) { return DUPL_RETURN::DUPL_RETURN_ERROR_EXPECTED; }
+    DUPL_RETURN DXFrameProcessorSync::ProcessFrame() { return DUPL_RETURN::DUPL_RETURN_ERROR_EXPECTED; }
 
 } // namespace Screen_Capture
 } // namespace SL
@@ -21,7 +26,7 @@ namespace Screen_Capture {
 namespace SL {
     namespace Screen_Capture {
 
-        DUPL_RETURN DXFrameProcessor::Init(std::shared_ptr<Thread_Data> data, Monitor &monitor) {
+        DUPL_RETURN DXFrameProcessorSync::InitSync(std::shared_ptr<Sync_Data> data, Monitor &monitor) {
             SelectedMonitor = monitor;
             DX_RESOURCES res;
             auto ret = Initialize(res);
@@ -48,19 +53,37 @@ namespace SL {
         // Process a given frame and its metadata
         //
 
-        DUPL_RETURN DXFrameProcessor::ProcessFrame(const Monitor &currentmonitorinfo) {
+        DUPL_RETURN DXFrameProcessorSync::ProcessFrame(const Monitor &currentmonitorinfo) {
             Microsoft::WRL::ComPtr<IDXGIResource> DesktopResource;
             DXGI_OUTDUPL_FRAME_INFO FrameInfo = {0};
             AquireFrameRAII frame(OutputDuplication.Get());
 
             // Get new frame
-            auto hr = frame.AcquireNextFrame(100, &FrameInfo, DesktopResource.GetAddressOf());
-            if (hr == DXGI_ERROR_WAIT_TIMEOUT) {
-                return DUPL_RETURN_SUCCESS;
-            } else if (FAILED(hr)) {
-                return ProcessFailure(Device.Get(), L"Failed to acquire next frame in DUPLICATIONMANAGER", L"Error", hr,
-                                      FrameInfoExpectedErrors);
+            HRESULT hr = 0;
+            auto onNewFramestart = std::chrono::high_resolution_clock::now();
+            while (true) {
+                hr = frame.AcquireNextFrame(100, &FrameInfo, DesktopResource.GetAddressOf());
+                if (hr == DXGI_ERROR_WAIT_TIMEOUT) {
+                    // ???
+                } else if (FAILED(hr)) {
+                    // _com_error err(hr);
+                    // LPCTSTR errMsg = err.ErrorMessage();
+                    // std::cout << "ProcessFrame FAILED(hr): " << errMsg << std::endl;
+                    // break;
+                }
+
+                if (FrameInfo.AccumulatedFrames == 0) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                } else {
+                    break;
+                }
+                // move to parameters or pre-init values
+                if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - onNewFramestart).count() >=
+                    3000) {
+                    break;
+                }
             }
+
             if (FrameInfo.AccumulatedFrames == 0) {
                 return DUPL_RETURN_SUCCESS;
             }
@@ -123,7 +146,12 @@ namespace SL {
             ProcessCapture(Data->ScreenCaptureData, *this, SelectedMonitor, startsrc, MappingDesc.RowPitch);
             return DUPL_RETURN_SUCCESS;
         }
+
+        DXFrameProcessorSync::DXFrameProcessorSync() {
+            this->ok = false;
+        }
     } // namespace Screen_Capture
 } // namespace SL
 
 #endif
+

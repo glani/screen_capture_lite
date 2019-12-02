@@ -23,7 +23,7 @@ namespace SL {
 
         template <typename Block>
         class BitMap {
-            static_assert(std::is_unsigned<Block>::value);
+            // static_assert(std::is_unsigned<Block>::value);
             static const size_t BitsPerBlock = sizeof(Block) * 8;
 
         public:

@@ -30,15 +30,15 @@ namespace Screen_Capture {
         if (!(cursorInfo.flags & CURSOR_SHOWING)) {
             return DUPL_RETURN_SUCCESS; // the mouse cursor is hidden no need to do anything.
         }
-        ICONINFOEXA ii;
-        memset(&ii, 0, sizeof(ii));
-        ii.cbSize = sizeof(ii);
-        if (GetIconInfoExA(cursorInfo.hCursor, &ii) == FALSE) {
-            return DUPL_RETURN::DUPL_RETURN_ERROR_EXPECTED;
-        }
+//        ICONINFOEXA ii;
+//        memset(&ii, 0, sizeof(ii));
+//        ii.cbSize = sizeof(ii);
+//        if (GetIconInfoExA(cursorInfo.hCursor, &ii) == FALSE) {
+//            return DUPL_RETURN::DUPL_RETURN_ERROR_EXPECTED;
+//        }
         HBITMAPWrapper colorbmp, maskbmp;
-        colorbmp.Bitmap = ii.hbmColor;
-        maskbmp.Bitmap = ii.hbmMask;
+//        colorbmp.Bitmap = ii.hbmColor;
+//        maskbmp.Bitmap = ii.hbmMask;
         HBITMAPWrapper bitmap;
         bitmap.Bitmap = CreateCompatibleBitmap(MonitorDC.DC, MaxCursurorSize, MaxCursurorSize);
 
@@ -70,14 +70,14 @@ namespace Screen_Capture {
         auto wholeimg = CreateImage(ret, 0, (ImageBGRA *)NewImageBuffer.get());
 
         // need to make sure the alpha channel is correct
-        if (ii.wResID == 32513) { // when its just the i beam
-            auto ptr = (unsigned int *)NewImageBuffer.get();
-            for (auto i = 0; i < Width(wholeimg) * Height(wholeimg); i++) {
-                if (ptr[i] != 0) {
-                    ptr[i] = 0xff000000;
-                }
-            }
-        }
+//        if (ii.wResID == 32513) { // when its just the i beam
+//            auto ptr = (unsigned int *)NewImageBuffer.get();
+//            for (auto i = 0; i < Width(wholeimg) * Height(wholeimg); i++) {
+//                if (ptr[i] != 0) {
+//                    ptr[i] = 0xff000000;
+//                }
+//            }
+//        }
         // else if (ii.hbmMask != nullptr && ii.hbmColor == nullptr) {// just
         //	auto ptr = (unsigned int*)NewImageBuffer.get();
         //	for (auto i = 0; i < RowStride(*wholeimg) *Height(*wholeimg) / 4; i++) {
@@ -91,7 +91,7 @@ namespace Screen_Capture {
         int lasty = static_cast<int>(cursorInfo.ptScreenPos.y);
         MousePoint mousepoint = {};
         mousepoint.Position = Point{lastx, lasty};
-        mousepoint.HotSpot = Point{static_cast<int>(ii.xHotspot), static_cast<int>(ii.yHotspot)};
+//        mousepoint.HotSpot = Point{static_cast<int>(ii.xHotspot), static_cast<int>(ii.yHotspot)};
 
         if (Data->ScreenCaptureData.OnMouseChanged || Data->WindowCaptureData.OnMouseChanged) {
             // if the mouse image is different, send the new image and swap the data
