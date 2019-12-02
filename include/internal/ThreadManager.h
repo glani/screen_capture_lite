@@ -135,6 +135,43 @@ namespace Screen_Capture {
         return true;
     }
 
+    template <class T, class F> bool TryCaptureMonitorSync(const F &data, Monitor &monitor) {
+        T frameprocessor;
+        frameprocessor.ImageBufferSize = Width(monitor) * Height(monitor) * sizeof(ImageBGRA);
+        if (data->ScreenCaptureData.OnFrameChanged) {
+            // only need the old buffer if difs are needed. If no dif is needed, then the
+            // image is always new
+            frameprocessor.ImageBuffer = std::make_unique<unsigned char[]>(frameprocessor.ImageBufferSize);
+        }
+        auto startmonitors = GetMonitors();
+        auto ret = frameprocessor.InitSync(data, monitor);
+        if (ret != DUPL_RETURN_SUCCESS) {
+            return false;
+        }
+
+        auto monitors = GetMonitors();
+
+        if (isMonitorInsideBounds(monitors, monitor) && !HasMonitorsChanged(startmonitors, monitors)) {
+            ret = frameprocessor.ProcessFrame(monitors[Index(monitor)]);
+        }
+        else {
+            // something happened, rebuild
+            ret = DUPL_RETURN_ERROR_EXPECTED;
+        }
+        if (ret != DUPL_RETURN_SUCCESS) {
+//            if (ret == DUPL_RETURN_ERROR_EXPECTED) {
+//                // ???
+//            }
+//            else {
+//                // ???
+//            }
+            return false;
+        }
+
+        return true;
+    }
+
+
     template <class T, class F> bool TryCaptureWindow(const F &data, Window &wnd)
     {
         T frameprocessor;

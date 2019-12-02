@@ -1,6 +1,7 @@
 #include "internal/SCCommon.h"
 #include "ScreenCapture.h"
 #include "internal/ThreadManager.h"
+#include "internal/SyncRunner.h"
 #include <algorithm>
 #include <assert.h>
 #include <atomic>
@@ -192,5 +193,72 @@ namespace Screen_Capture {
         impl->Thread_Data_->WindowCaptureData.getThingsToWatch = windowtocapture;
         return std::make_shared<WindowCaptureConfiguration>(impl);
     }
+
+    static bool ScreenCaptureManagerSyncExists = false;
+    class ScreenCaptureManagerSync: public IScreenCaptureManagerSync {
+    private:
+        SyncRunner syncManager;
+    public:
+        std::shared_ptr<Sync_Data> data;
+
+        ScreenCaptureManagerSync()
+        {
+            assert(!ScreenCaptureManagerExists);
+            ScreenCaptureManagerSyncExists = true;
+            data = std::make_shared<Sync_Data>();
+        }
+        virtual ~ScreenCaptureManagerSync()
+        {
+            ScreenCaptureManagerSyncExists = false;
+        }
+
+        void start()
+        {
+            if (data->ScreenCaptureData.getThingsToWatch) {
+                auto monitors = data->ScreenCaptureData.getThingsToWatch();
+                auto mons = GetMonitors();
+                for (auto &m : monitors) {
+                    assert(isMonitorInsideBounds(mons, m));
+                }
+
+                for (auto &m : monitors) {
+                    SL::Screen_Capture::RunCaptureMonitor(data, m);
+                }
+            }
+        }
+    };
+
+    class ScreenCaptureConfigurationSync : public ICaptureConfigurationSync<ScreenCaptureCallback> {
+        std::shared_ptr<ScreenCaptureManagerSync> Impl_;
+
+    public:
+        ScreenCaptureConfigurationSync(const std::shared_ptr<ScreenCaptureManagerSync> &impl) : Impl_(impl) {}
+
+        virtual std::shared_ptr<ICaptureConfigurationSync<ScreenCaptureCallback>> onNewFrame(const ScreenCaptureCallback &cb) override
+        {
+            Impl_->data->ScreenCaptureData.OnNewFrame = cb;
+            return std::make_shared<ScreenCaptureConfigurationSync>(Impl_);
+        }
+        virtual std::shared_ptr<ICaptureConfigurationSync<ScreenCaptureCallback>> onFrameChanged(const ScreenCaptureCallback &cb) override
+        {
+            Impl_->data->ScreenCaptureData.OnFrameChanged = cb;
+            return std::make_shared<ScreenCaptureConfigurationSync>(Impl_);
+        }
+
+        virtual std::shared_ptr<IScreenCaptureManagerSync> startCapturing() override
+        {
+            Impl_->start();
+            return Impl_;
+        }
+    };
+
+
+    std::shared_ptr<ICaptureConfigurationSync<ScreenCaptureCallback>> CreateCaptureConfigurationSync(const MonitorCallback &monitorstocapture)
+    {
+        auto impl = std::make_shared<ScreenCaptureManagerSync>();
+        impl->data->ScreenCaptureData.getThingsToWatch = monitorstocapture;
+        return std::make_shared<ScreenCaptureConfigurationSync>(impl);
+    }
+
 } // namespace Screen_Capture
 } // namespace SL
