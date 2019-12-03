@@ -1,3 +1,4 @@
+#import <iostream>
 #include "NSFrameProcessorSyncm.h"
 
 @implementation FrameProcessorSync
@@ -5,6 +6,7 @@
 - (SL::Screen_Capture::DUPL_RETURN)Init:(SL::Screen_Capture::NSFrameProcessorSync *)parent {
     self = [super init];
     if (self) {
+        self.Working = false;
         self.nsframeprocessor = parent;
         self.avcapturesession = [[AVCaptureSession alloc] init];
 
@@ -50,6 +52,9 @@
 
 - (void)dealloc {
     [self.avcapturesession stopRunning];
+    while (self.avcapturesession.isRunning || self.Working) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
     [self.output release];
     [self.avinput release];
     [self.avcapturesession release];
@@ -61,10 +66,29 @@
 }
 
 - (void)captureOutput:(AVCaptureOutput *)captureOutput didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer fromConnection:(AVCaptureConnection *)connection {
-
+    self.Working = true;
     if (!self.avcapturesession.isRunning) {
+        self.Working = false;
         return;
     }
+
+    [self.avcapturesession stopRunning];
+    if (self.output) {
+        self.output.connections[0].enabled = NO;
+    }
+
+
+    bool processed = false;
+    std::unique_lock<std::mutex> __(self.nsframeprocessor->okMutex);
+    processed = self.nsframeprocessor->ok;
+    __.unlock();
+
+    // std::cout << "Thread Id: " << std::this_thread::get_id() << std::endl;
+    if (processed) {
+        self.Working = false;
+        return;
+    }
+
     auto data = self.nsframeprocessor->Data;
     auto &selectedmonitor = self.nsframeprocessor->SelectedMonitor;
 
@@ -75,7 +99,9 @@
     SL::Screen_Capture::ProcessCapture(data->ScreenCaptureData, *(self.nsframeprocessor), selectedmonitor, buf,
                                        bytesperrow);
     CVPixelBufferUnlockBaseAddress(imageBuffer, kCVPixelBufferLock_ReadOnly);
-    [self.avcapturesession stopRunning];
+
+    self.Working = false;
+
     std::unique_lock<std::mutex> _(self.nsframeprocessor->okMutex);
     self.nsframeprocessor->ok = true;
     self.nsframeprocessor->okCondition.notify_one();
