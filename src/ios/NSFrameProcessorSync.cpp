@@ -26,7 +26,8 @@ namespace SL {
         DUPL_RETURN NSFrameProcessorSync::ProcessFrame(const Monitor &curentmonitorinfo) {
             setMinFrameDurationSync(NSFrameProcessorSyncImpl_, std::chrono::seconds(100));
             std::unique_lock<std::mutex> lock(this->okMutex);
-            this->okCondition.wait_for(lock, std::chrono::milliseconds(10000), [this] { return this->ok; });
+//            this->okCondition.wait_for(lock, std::chrono::milliseconds(10000), [this] { return this->ok; });
+            this->okCondition.wait(lock, [this] { return this->ok; });
             return this->ok ? DUPL_RETURN_SUCCESS : DUPL_RETURN_ERROR_EXPECTED;
         }
     }

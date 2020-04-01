@@ -168,7 +168,7 @@ namespace SL {
         }
 
         DUPL_RETURN Init(NSFrameProcessorSyncImpl *createdimpl, NSFrameProcessorSync *parent) {
-            if (RequestPermissions()) {
+            if (DUPL_RETURN::DUPL_RETURN_SUCCESS == RequestPermissions()) {
                 if (createdimpl) {
                     return createdimpl->Init(parent);
                 }
