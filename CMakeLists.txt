@@ -3,6 +3,7 @@ project(screen_capture_lite)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 set(CMAKE_CXX_EXTENSIONS OFF)
 option(BUILD_SHARED_LIBS "Build shared library" OFF)
 option(BUILD_EXAMPLE "Build example" ON)

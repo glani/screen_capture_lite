@@ -212,7 +212,7 @@ namespace Screen_Capture {
             ScreenCaptureManagerSyncExists = false;
         }
 
-        void start()
+        bool start()
         {
             if (data->ScreenCaptureData.getThingsToWatch) {
                 auto monitors = data->ScreenCaptureData.getThingsToWatch();
@@ -221,9 +221,14 @@ namespace Screen_Capture {
                     assert(isMonitorInsideBounds(mons, m));
                 }
 
+                bool result = true;
+
                 for (auto &m : monitors) {
-                    SL::Screen_Capture::RunCaptureMonitor(data, m);
+                    result &= SL::Screen_Capture::RunCaptureMonitor(data, m);
                 }
+                return result;
+            } else {
+                return false;
             }
         }
     };

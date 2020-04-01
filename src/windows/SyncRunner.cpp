@@ -31,11 +31,11 @@ namespace SL {
             return true;
         }
 
-        void RunCaptureMonitor(std::shared_ptr<Sync_Data> data, Monitor monitor)
+        bool RunCaptureMonitor(std::shared_ptr<Sync_Data> data, Monitor monitor)
         {
             // need to switch to the input desktop for capturing...
             if (!SwitchToInputDesktopSync(data))
-                return;
+                return false;
 #if defined _DEBUG || !defined NDEBUG
             std::cout << "Starting to Capture on Monitor " << Name(monitor) << std::endl;
             std::cout << "Trying DirectX Desktop Duplication " << std::endl;
@@ -44,8 +44,14 @@ namespace SL {
 #if defined _DEBUG || !defined NDEBUG
                 std::cout << "DirectX Desktop Duplication not supported, falling back to GDI Capturing . . ." << std::endl;
 #endif
-                TryCaptureMonitorSync<GDIFrameProcessorSync>(data, monitor);
+                return TryCaptureMonitorSync<GDIFrameProcessorSync>(data, monitor);
             }
+
+            return true;
+        }
+
+        bool RequestPermissionsSync() {
+            return true;
         }
 
     }
