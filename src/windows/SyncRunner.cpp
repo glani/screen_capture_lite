@@ -31,7 +31,7 @@ namespace SL {
             return true;
         }
 
-        void RunCaptureMonitor(std::shared_ptr<Sync_Data> data, Monitor monitor)
+        bool RunCaptureMonitor(std::shared_ptr<Sync_Data> data, Monitor monitor)
         {
             // need to switch to the input desktop for capturing...
             if (!SwitchToInputDesktopSync(data))

@@ -216,6 +216,7 @@ namespace Screen_Capture {
     // the callback of windowstocapture represents the list of monitors which should be captured. Users should return the list of monitors they want
     // to be captured
     SC_LITE_EXTERN std::shared_ptr<ICaptureConfigurationSync<ScreenCaptureCallback>> CreateCaptureConfigurationSync(const MonitorCallback &monitorstocapture);
+    SC_LITE_EXTERN bool RequestPermissionsSync();
 
 } // namespace Screen_Capture
 } // namespace SL

@@ -10,6 +10,7 @@ namespace SL {
         void setMinFrameDurationSync(NSFrameProcessorSyncImpl*, const std::chrono::microseconds& );
         
         DUPL_RETURN Init(NSFrameProcessorSyncImpl* createdimpl, NSFrameProcessorSync* parent);
+        DUPL_RETURN RequestPermissions();
         
         class NSFrameProcessorSync : public BaseFrameProcessorSync {
             NSFrameProcessorSyncImpl* NSFrameProcessorSyncImpl_ = nullptr;
@@ -22,7 +23,7 @@ namespace SL {
             bool ok;
             DUPL_RETURN InitSync(std::shared_ptr<Sync_Data> data, Monitor& monitor);
             DUPL_RETURN ProcessFrame(const Monitor& curentmonitorinfo);
-            
+            DUPL_RETURN RequestPermissions();
         };
     }
 }

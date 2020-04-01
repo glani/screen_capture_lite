@@ -7,8 +7,8 @@
 
 namespace SL {
     namespace Screen_Capture {
-        void RunCaptureMonitor(std::shared_ptr<Sync_Data> data, Monitor monitor) {
-            TryCaptureMonitorSync<X11FrameProcessorSync>(data, monitor);
+        bool RunCaptureMonitor(std::shared_ptr<Sync_Data> data, Monitor monitor) {
+            return TryCaptureMonitorSync<X11FrameProcessorSync>(data, monitor);
         }
     }
 }

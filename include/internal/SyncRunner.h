@@ -26,7 +26,7 @@ namespace SL {
             void Init(const std::shared_ptr <Sync_Data> &data);
         };
 
-        void RunCaptureMonitor(std::shared_ptr<Sync_Data> data, Monitor monitor);
+        bool RunCaptureMonitor(std::shared_ptr<Sync_Data> data, Monitor monitor);
     }
 }
 #endif //SIMPLE_SCREENSHOT_MAKER_SYNCRUNNER_H

@@ -135,6 +135,15 @@ namespace Screen_Capture {
         return true;
     }
 
+    template <class T> bool RequestPermissionsSync() {
+        T frameprocessor;
+        auto ret = frameprocessor.RequestPermissions();
+        if (ret != DUPL_RETURN_SUCCESS) {
+            return false;
+        }
+        return true;
+    }
+
     template <class T, class F> bool TryCaptureMonitorSync(const F &data, Monitor &monitor) {
         T frameprocessor;
         frameprocessor.ImageBufferSize = Width(monitor) * Height(monitor) * sizeof(ImageBGRA);

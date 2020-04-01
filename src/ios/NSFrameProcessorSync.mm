@@ -156,11 +156,25 @@ namespace SL {
             }
         }
 
+        DUPL_RETURN RequestPermissions() {
+            CGDisplayStreamRef stream = CGDisplayStreamCreate(CGMainDisplayID(), 1, 1, kCVPixelFormatType_32BGRA, nil,
+                                                              ^(CGDisplayStreamFrameStatus status, uint64_t displayTime, IOSurfaceRef frameSurface, CGDisplayStreamUpdateRef updateRef) {});
+
+            if (stream != nil) {
+                CGDisplayStreamStop(stream);
+                return DUPL_RETURN::DUPL_RETURN_SUCCESS;
+            }
+            return DUPL_RETURN::DUPL_RETURN_ERROR_EXPECTED;
+        }
+
         DUPL_RETURN Init(NSFrameProcessorSyncImpl *createdimpl, NSFrameProcessorSync *parent) {
-            if (createdimpl) {
-                return createdimpl->Init(parent);
+            if (RequestPermissions()) {
+                if (createdimpl) {
+                    return createdimpl->Init(parent);
+                }
             }
             return DUPL_RETURN::DUPL_RETURN_ERROR_UNEXPECTED;
         }
+
     }
 }
