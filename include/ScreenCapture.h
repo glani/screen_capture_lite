@@ -28,13 +28,19 @@ namespace Screen_Capture {
         Point Position;
         Point HotSpot;
     };
+    struct SC_LITE_EXTERN WindowAttribute {
+        std::string Code;
+        std::string Value;
+    };
     struct SC_LITE_EXTERN Window {
         size_t Handle;
         Point Position;
 
         Point Size;
         // Name will always be lower case. It is converted to lower case internally by the library for comparisons
-        char Name[128] = {0};
+        std::string Name;
+
+        std::vector<WindowAttribute> Attributes;
     };
     struct SC_LITE_EXTERN Monitor {
         int Id = INT32_MAX;
@@ -50,7 +56,7 @@ namespace Screen_Capture {
         int OffsetY = 0;
         int OriginalOffsetX = 0;
         int OriginalOffsetY = 0;
-        char Name[128] = {0};
+        std::string Name;
         float Scaling = 1.0f;
     };
 
@@ -141,9 +147,12 @@ namespace Screen_Capture {
         std::chrono::microseconds duration() const { return Duration; }
     };
     // will return all attached monitors
-    SC_LITE_EXTERN std::vector<Monitor> GetMonitors();
+    SC_LITE_EXTERN std::shared_ptr<std::vector<Monitor>> GetMonitors();
     // will return all windows
-    SC_LITE_EXTERN std::vector<Window> GetWindows();
+    SC_LITE_EXTERN std::shared_ptr<std::vector<Window>> GetWindows();
+
+    // will return active window
+    std::shared_ptr<Window> GetActiveWindow();
 
     typedef std::function<void(const SL::Screen_Capture::Image &img, const Window &window)> WindowCaptureCallback;
     typedef std::function<void(const SL::Screen_Capture::Image &img, const Monitor &monitor)> ScreenCaptureCallback;

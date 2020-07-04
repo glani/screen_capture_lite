@@ -158,4 +158,13 @@ install(FILES
         DESTINATION include
         )
 enable_testing()
-# add_subdirectory(Example)
+
+
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    if (LINUX)
+        add_subdirectory(Example)
+    endif ()
+endif (CMAKE_BUILD_TYPE STREQUAL "Debug")
+
+
+

@@ -58,31 +58,32 @@ namespace {
         return x;
     }
 
+    auto GetWMIconName(Display* display, Window window)
+    {
+        auto x = UniqueTextProperty{};
+        XGetWMIconName(display, window, &x.get());
+        return x;
+    }
+
     auto TextPropertyToStrings(
         Display* dpy,
         const XTextProperty& prop
     )
     {
-        char **list;
-        auto n_strings = 0;
         auto result = std::vector<std::string>{};
 
-        auto status = XmbTextPropertyToTextList(
-            dpy,
-            &prop,
-            &list,
-            &n_strings
-        );
+        auto datalen = (int) prop.nitems;
 
-        if (status < Success or not n_strings or not *list) {
-            return result;
+        int elemStart = 0;
+        char* cp = (char *) prop.value;
+        for (int i = datalen; i >= 0; cp++, i--) {
+            if (*cp == '\0') {
+                int len = datalen - i - elemStart;
+                std::string s1((char*)(prop.value + elemStart), len);
+                result.emplace_back(s1);
+                elemStart = datalen - i + 1;
+            }
         }
-
-        for (auto i = 0; i < n_strings; ++i) {
-            result.emplace_back(list[i]);
-        }
-
-        XFreeStringList(list);
 
         return result;
     }
@@ -92,31 +93,66 @@ namespace SL
 {
 namespace Screen_Capture
 {
+    std::shared_ptr<std::vector<Window>> getWindows(const std::string& netRequestedAtom);
 
     void AddWindow(Display* display, XID& window, std::vector<Window>& wnd)
     {
         using namespace std::string_literals;
 
         auto wm_name = GetWMName(display, window);
+
+
         auto candidates = TextPropertyToStrings(display, wm_name.get());
-        Window w = {};
-        w.Handle = reinterpret_cast<size_t>(window);
-
-        XWindowAttributes wndattr;
-        XGetWindowAttributes(display, window, &wndattr);
-
-        w.Position = Point{ wndattr.x, wndattr.y };
-        w.Size = Point{ wndattr.width, wndattr.height };
-		
         auto name = candidates.empty() ? ""s : std::move(candidates.front());
-        std::transform(name.begin(), name.end(), std::begin(w.Name), ::tolower);
-        wnd.push_back(w);
+        if (!name.empty()) {
+            Window w = {};
+            w.Handle = reinterpret_cast<size_t>(window);
+
+            XWindowAttributes wndattr;
+            XGetWindowAttributes(display, window, &wndattr);
+
+            w.Position = Point{ wndattr.x, wndattr.y };
+            w.Size = Point{ wndattr.width, wndattr.height };
+            w.Name = name;
+
+            XClassHint hint;
+            XGetClassHint(
+                    display,
+                    window,
+                    &hint);
+            WindowAttribute attributeClass;
+            attributeClass.Code = std::string("res_class");
+            attributeClass.Value = hint.res_class != NULL ? std::string(hint.res_class) : ""s;
+            w.Attributes.emplace_back(attributeClass);
+
+            WindowAttribute attributeName;
+            attributeName.Code = std::string("res_name");
+            attributeName.Value = hint.res_name != NULL ? std::string(hint.res_name) : ""s;
+            w.Attributes.emplace_back(attributeName);
+            wnd.emplace_back(w);
+        }
     }
 
-    std::vector<Window> GetWindows()
+    std::shared_ptr<Window> GetActiveWindow() {
+        auto res = getWindows(std::string("_NET_ACTIVE_WINDOW"));
+        if (!res->empty()) {
+            return std::make_shared<Window>(res->front());
+        } else {
+            return std::shared_ptr<Window>();
+        }
+    }
+
+    std::shared_ptr<std::vector<Window>> GetWindows()
     {
+        return getWindows(std::string("_NET_CLIENT_LIST"));
+    }
+
+    std::shared_ptr<std::vector<Window>> getWindows(const std::string& netRequestedAtom) {
+        std::shared_ptr<std::vector<Window>> result = std::make_shared<std::vector<Window>>();
+
         auto* display = XOpenDisplay(NULL);
-        Atom a = XInternAtom(display, "_NET_CLIENT_LIST", true);
+
+        Atom a = XInternAtom(display, netRequestedAtom.c_str(), true);
         Atom actualType;
         int format;
         unsigned long numItems, bytesAfter;
@@ -133,17 +169,16 @@ namespace Screen_Capture
                                         &numItems,
                                         &bytesAfter,
                                         &data);
-        std::vector<Window> ret;
         if(status >= Success && numItems) {
             auto array = (XID*)data;
             for(decltype(numItems) k = 0; k < numItems; k++) {
                 auto w = array[k];
-                AddWindow(display, w, ret);
+                AddWindow(display, w, *result);
             }
             XFree(data);
         }
         XCloseDisplay(display);
-        return ret;
+        return result;
     }
 }
 }

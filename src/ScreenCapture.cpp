@@ -218,7 +218,7 @@ namespace Screen_Capture {
                 auto monitors = data->ScreenCaptureData.getThingsToWatch();
                 auto mons = GetMonitors();
                 for (auto &m : monitors) {
-                    assert(isMonitorInsideBounds(mons, m));
+                    assert(isMonitorInsideBounds(*mons, m));
                 }
 
                 bool result = true;

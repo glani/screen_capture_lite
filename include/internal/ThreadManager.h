@@ -106,8 +106,8 @@ namespace Screen_Capture {
             auto timer = std::atomic_load(&data->ScreenCaptureData.FrameTimer);
             timer->start();
             auto monitors = GetMonitors();
-            if (isMonitorInsideBounds(monitors, monitor) && !HasMonitorsChanged(startmonitors, monitors)) {
-                ret = frameprocessor.ProcessFrame(monitors[Index(monitor)]);
+            if (isMonitorInsideBounds(*monitors, monitor) && !HasMonitorsChanged(*startmonitors, *monitors)) {
+                ret = frameprocessor.ProcessFrame(monitors->at(Index(monitor)));
             }
             else {
                 // something happened, rebuild
@@ -160,8 +160,8 @@ namespace Screen_Capture {
 
         auto monitors = GetMonitors();
 
-        if (isMonitorInsideBounds(monitors, monitor) && !HasMonitorsChanged(startmonitors, monitors)) {
-            ret = frameprocessor.ProcessFrame(monitors[Index(monitor)]);
+        if (isMonitorInsideBounds(*monitors, monitor) && !HasMonitorsChanged(*startmonitors, *monitors)) {
+            ret = frameprocessor.ProcessFrame(monitors->at(Index(monitor)));
         }
         else {
             // something happened, rebuild

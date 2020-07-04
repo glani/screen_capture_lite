@@ -62,10 +62,10 @@ void createframegrabber()
         SL::Screen_Capture::CreateCaptureConfiguration([]() {
             auto mons = SL::Screen_Capture::GetMonitors();
             std::cout << "Library is requesting the list of monitors to capture!" << std::endl;
-            for (auto &m : mons) {
+            for (auto &m : *mons) {
                 std::cout << m << std::endl;
             }
-            return mons;
+            return *mons;
         })
             ->onFrameChanged([&](const SL::Screen_Capture::Image &img, const SL::Screen_Capture::Monitor &monitor) {
                 // std::cout << "Difference detected!  " << img.Bounds << std::endl;
@@ -121,7 +121,7 @@ void createpartialframegrabber()
         SL::Screen_Capture::CreateCaptureConfiguration([]() {
             auto mons = SL::Screen_Capture::GetMonitors();
             std::cout << "Library is requesting the list of monitors to capture!" << std::endl;
-            for (auto &m : mons) {
+            for (auto &m : *mons) {
                 // capture just a 512x512 square...  USERS SHOULD MAKE SURE bounds are
                 // valid!!!!
                 SL::Screen_Capture::OffsetX(m, SL::Screen_Capture::OffsetX(m) + 512);
@@ -131,7 +131,7 @@ void createpartialframegrabber()
 
                 std::cout << m << std::endl;
             }
-            return mons;
+            return *mons;
         })
             ->onFrameChanged([&](const SL::Screen_Capture::Image &img, const SL::Screen_Capture::Monitor &monitor) {
                 // std::cout << "Difference detected!  " << img.Bounds << std::endl;
@@ -193,15 +193,15 @@ void createwindowgrabber()
             // convert to lower case for easier comparisons
             std::transform(srchterm.begin(), srchterm.end(), srchterm.begin(), [](char c) { return std::tolower(c, std::locale()); });
             decltype(windows) filtereditems;
-            for (auto &a : windows) {
+            for (auto &a : *windows) {
                 std::string name = a.Name;
                 std::transform(name.begin(), name.end(), name.begin(), [](char c) { return std::tolower(c, std::locale()); });
                 if (name.find(srchterm) != std::string::npos) {
-                    filtereditems.push_back(a);
+                    filtereditems->push_back(a);
                     std::cout << "ADDING WINDOW  Height " << a.Size.y << "  Width  " << a.Size.x << "   " << a.Name << std::endl;
                 }
             }
-            return filtereditems;
+            return *filtereditems;
         })
 
             ->onFrameChanged([&](const SL::Screen_Capture::Image &img, const SL::Screen_Capture::Window &window) {
@@ -253,26 +253,30 @@ void createwindowgrabber()
 }
 int main()
 {
+    auto windows = SL::Screen_Capture::GetWindows();
+
+    auto activeWindow = SL::Screen_Capture::GetActiveWindow();
+
     std::srand(std::time(nullptr));
     std::cout << "Starting Capture Demo/Test" << std::endl;
     std::cout << "Testing captured monitor bounds check" << std::endl;
 
     auto goodmonitors = SL::Screen_Capture::GetMonitors();
-    for (auto &m : goodmonitors) {
+    for (auto &m : *goodmonitors) {
         std::cout << m << std::endl;
-        assert(SL::Screen_Capture::isMonitorInsideBounds(goodmonitors, m));
+        assert(SL::Screen_Capture::isMonitorInsideBounds(*goodmonitors, m));
     }
     auto badmonitors = SL::Screen_Capture::GetMonitors();
 
-    for (auto m : badmonitors) {
+    for (auto m : *badmonitors) {
         m.Height += 1;
         std::cout << m << std::endl;
-        assert(!SL::Screen_Capture::isMonitorInsideBounds(goodmonitors, m));
+        assert(!SL::Screen_Capture::isMonitorInsideBounds(*goodmonitors, m));
     }
-    for (auto m : badmonitors) {
+    for (auto m : *badmonitors) {
         m.Width += 1;
         std::cout << m << std::endl;
-        assert(!SL::Screen_Capture::isMonitorInsideBounds(goodmonitors, m));
+        assert(!SL::Screen_Capture::isMonitorInsideBounds(*goodmonitors, m));
     }
     std::cout << "Running display capturing for 10 seconds" << std::endl;
     createframegrabber();
