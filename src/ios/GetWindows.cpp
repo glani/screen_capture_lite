@@ -5,73 +5,165 @@
 #include "TargetConditionals.h"
 #include <ApplicationServices/ApplicationServices.h>
 #include <iostream>
+#include "ios/NSWorkspaceWrapper.h"
 
-namespace SL
-{
-namespace Screen_Capture
-{
+namespace SL {
+    namespace Screen_Capture {
 
-    std::vector<Window> GetWindows()
-    {
-        CGDisplayCount count=0;
-        CGGetActiveDisplayList(0, 0, &count);
-        std::vector<CGDirectDisplayID> displays;
-        displays.resize(count);
-        CGGetActiveDisplayList(count, displays.data(), &count);
-        auto xscale=1.0f;
-        auto yscale = 1.0f;
-        
-        for(auto  i = 0; i < count; i++) {
-            //only include non-mirrored displays
-            if(CGDisplayMirrorsDisplay(displays[i]) == kCGNullDirectDisplay){
-                
-                auto dismode =CGDisplayCopyDisplayMode(displays[i]);
-                auto scaledsize = CGDisplayBounds(displays[i]);
-            
-                auto pixelwidth = CGDisplayModeGetPixelWidth(dismode);
-                auto pixelheight = CGDisplayModeGetPixelHeight(dismode);
-                
-                CGDisplayModeRelease(dismode);
-                
-                if(scaledsize.size.width !=pixelwidth){//scaling going on!
-                    xscale = static_cast<float>(pixelwidth)/static_cast<float>(scaledsize.size.width);
+        std::shared_ptr<std::string> getString(const CFStringRef &value);
+
+        void determineScaleValues(float &xscale, float &yscale);
+
+        std::shared_ptr<Window> getWindow(const __CFDictionary *dict, float xscale, float yscale);
+
+        std::shared_ptr<Window> GetActiveWindow() {
+            auto xscale = 1.0f;
+            auto yscale = 1.0f;
+            determineScaleValues(xscale, yscale);
+
+            std::unique_ptr<NSWorkspaceWrapper> ptrWrapper(new NSWorkspaceWrapper());
+            size_t pid = ptrWrapper->determineFrontmostApplicationPID();
+            int option = kCGWindowListOptionOnScreenOnly;
+            auto windowList = CGWindowListCopyWindowInfo(option, kCGNullWindowID);
+            std::shared_ptr<Window> ret; // = std::make_shared<Window>();
+            CFIndex numWindows = CFArrayGetCount(windowList);
+            for (int i = 0; i < (int) numWindows; i++) {
+                auto dict = static_cast<CFDictionaryRef>(CFArrayGetValueAtIndex(windowList, i));
+
+                auto windowOwnerPID = static_cast<CFNumberRef>(CFDictionaryGetValue(dict, kCGWindowOwnerPID));
+                size_t windowPid;
+                if (windowOwnerPID != NULL && CFNumberGetValue(windowOwnerPID, kCFNumberSInt32Type, &windowPid)) {
+                    if (pid == windowPid) {
+                        auto w = getWindow(dict, xscale, yscale);
+                        if (w) {
+                            ret = w;
+                            break;
+                        }
+                    }
+
                 }
-                if(scaledsize.size.height !=pixelheight){//scaling going on!
-                    yscale = static_cast<float>(pixelheight)/static_cast<float>(scaledsize.size.height);
-                }
-                break;
             }
+            CFRelease(windowList);
+            return ret;
         }
-        
-        auto windowList = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID);
-        std::vector<Window> ret;
-        CFIndex numWindows = CFArrayGetCount(windowList );
-   
-        for( int i = 0; i < (int)numWindows; i++ ) {
-            Window w = {};
-            uint32_t windowid=0;
-            auto dict = static_cast<CFDictionaryRef>(CFArrayGetValueAtIndex(windowList, i));
+
+
+        std::shared_ptr<std::vector<Window>> GetWindows() {
+            auto xscale = 1.0f;
+            auto yscale = 1.0f;
+            determineScaleValues(xscale, yscale);
+
+            int option = kCGWindowListOptionAll;
+            auto windowList = CGWindowListCopyWindowInfo(option, kCGNullWindowID);
+            std::shared_ptr<std::vector<Window>> ret = std::make_shared<std::vector<Window>>();
+            CFIndex numWindows = CFArrayGetCount(windowList);
+            for (int i = 0; i < (int) numWindows; i++) {
+                auto dict = static_cast<CFDictionaryRef>(CFArrayGetValueAtIndex(windowList, i));
+                auto w = getWindow(dict, xscale, yscale);
+                if (w) {
+                    ret->emplace_back(*w);
+                }
+            }
+            CFRelease(windowList);
+            return ret;
+        }
+
+        std::shared_ptr<Window> getWindow(const __CFDictionary *dict, float xscale, float yscale) {
+
+            uint32_t windowid = 0;
             auto cfwindowname = static_cast<CFStringRef>(CFDictionaryGetValue(dict, kCGWindowName));
-            CFStringGetCString(cfwindowname, w.Name, sizeof(w.Name), kCFStringEncodingUTF8);
-            w.Name[sizeof(w.Name)-1] = '\n';
-     
-         
-            CFNumberGetValue(static_cast<CFNumberRef>(CFDictionaryGetValue(dict, kCGWindowNumber)), kCFNumberIntType, &windowid);
-            w.Handle = static_cast<size_t>(windowid);
-               
-            auto dims =static_cast<CFDictionaryRef>(CFDictionaryGetValue(dict,kCGWindowBounds));
+            if (cfwindowname == NULL) {
+                return std::shared_ptr<Window>();
+            }
+
+            auto windowName = getString(cfwindowname);
+            if (windowName == NULL) {
+                return std::shared_ptr<Window>();
+            }
+            auto windowPtr = std::make_shared<Window>((Window){});
+            windowPtr->Name = *windowName;
+            CFNumberGetValue(static_cast<CFNumberRef>(CFDictionaryGetValue(dict, kCGWindowNumber)),
+                             kCFNumberIntType, &windowid);
+            windowPtr->Handle = static_cast<size_t>(windowid);
+
+            auto dims = static_cast<CFDictionaryRef>(CFDictionaryGetValue(dict, kCGWindowBounds));
             CGRect rect;
             CGRectMakeWithDictionaryRepresentation(dims, &rect);
-            w.Position.x = static_cast<int>(rect.origin.x);
-            w.Position.y = static_cast<int>(rect.origin.y);
-                
-            w.Size.x = static_cast<int>(rect.size.width * xscale);
-            w.Size.y = static_cast<int>(rect.size.height* yscale);  
-	        std::transform(std::begin(w.Name), std::end(w.Name), std::begin(w.Name), ::tolower); 
-            ret.push_back(w);
+            windowPtr->Position.x = static_cast<int>(rect.origin.x);
+            windowPtr->Position.y = static_cast<int>(rect.origin.y);
+
+            windowPtr->Size.x = static_cast<int>(rect.size.width * xscale);
+            windowPtr->Size.y = static_cast<int>(rect.size.height * yscale);
+
+            auto ownerName = static_cast<CFStringRef>(CFDictionaryGetValue(dict, kCGWindowOwnerName));
+            if (ownerName != NULL) {
+                WindowAttribute attributeClass;
+                attributeClass.Code = std::string("res_class");
+                const std::string &ownerNameValue = *getString(ownerName);
+                attributeClass.Value = ownerNameValue;
+                windowPtr->Attributes.emplace_back(attributeClass);
+
+                WindowAttribute attributeName;
+                attributeName.Code = std::string("res_name");
+                attributeName.Value = ownerNameValue;
+                windowPtr->Attributes.emplace_back(attributeName);
+            }
+
+            WindowAttribute attributeVisible;
+            attributeVisible.Code = std::string("res_visible");
+
+            auto isOnScreen = static_cast<CFBooleanRef>(CFDictionaryGetValue(dict, kCGWindowIsOnscreen));
+            if (isOnScreen != NULL && CFBooleanGetValue(isOnScreen)) {
+                attributeVisible.Value = std::string("TRUE");
+            } else {
+                attributeVisible.Value = std::string("FALSE");
+            }
+            windowPtr->Attributes.emplace_back(attributeVisible);
+            return windowPtr;
         }
-        CFRelease(windowList);
-        return ret;
+
+        void determineScaleValues(float &xscale, float &yscale) {
+            CGDisplayCount count = 0;
+            CGGetActiveDisplayList(0, 0, &count);
+            std::__1::vector<CGDirectDisplayID> displays;
+            displays.resize(count);
+            CGGetActiveDisplayList(count, displays.data(), &count);
+
+
+            for (auto i = 0; i < count; i++) {
+                //only include non-mirrored displays
+                if (CGDisplayMirrorsDisplay(displays[i]) == kCGNullDirectDisplay) {
+
+                    auto dismode = CGDisplayCopyDisplayMode(displays[i]);
+                    auto scaledsize = CGDisplayBounds(displays[i]);
+
+                    auto pixelwidth = CGDisplayModeGetPixelWidth(dismode);
+                    auto pixelheight = CGDisplayModeGetPixelHeight(dismode);
+
+                    CGDisplayModeRelease(dismode);
+
+                    if (scaledsize.size.width != pixelwidth) {//scaling going on!
+                        xscale = static_cast<float>(pixelwidth) / static_cast<float>(scaledsize.size.width);
+                    }
+                    if (scaledsize.size.height != pixelheight) {//scaling going on!
+                        yscale = static_cast<float>(pixelheight) / static_cast<float>(scaledsize.size.height);
+                    }
+                    break;
+                }
+            }
+        }
+
+        std::shared_ptr<std::string> getString(const CFStringRef &value) {
+            CFIndex bufferSize = 2 * (CFStringGetLength(value) + 1);
+            char *buffer = new char[bufferSize];
+            std::unique_ptr<char> _(buffer);
+            std::string result;
+            if (CFStringGetCString(value, buffer, bufferSize, kCFStringEncodingUTF8)) {
+                auto basicString = std::string(
+                        buffer);
+                return std::make_shared<std::string>(basicString);
+            }
+            return std::shared_ptr<std::string>();
+        }
     }
-}
 }

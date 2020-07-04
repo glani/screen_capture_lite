@@ -58,6 +58,10 @@ elseif (APPLE)
             src/ios/GetMonitors.cpp
             src/ios/ThreadRunner.cpp
             src/ios/SyncRunner.cpp
+            src/ios/NSWorkspaceWrapper.mm
+            src/ios/NSWorkspaceWrapper.cpp
+            include/ios/NSWorkspaceWrapper.h
+            include/ios/NSWorkspaceWrapperm.h
             )
     set(SCREEN_CAPTURE_PLATFORM_INC
             include/ios
@@ -73,8 +77,7 @@ else ()
             src/linux/GetMonitors.cpp
             src/linux/GetWindows.cpp
             src/linux/ThreadRunner.cpp
-            src/linux/SyncRunner.cpp
-            )
+            src/linux/SyncRunner.cpp)
     find_package(X11 REQUIRED)
     if (!X11_XTest_FOUND)
         message(FATAL_ERROR "X11 extensions are required, but not found!")
@@ -161,7 +164,7 @@ enable_testing()
 
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    if (LINUX)
+    if (LINUX OR APPLE)
         add_subdirectory(Example)
     endif ()
 endif (CMAKE_BUILD_TYPE STREQUAL "Debug")
