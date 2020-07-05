@@ -257,6 +257,10 @@ int main()
 
     auto activeWindow = SL::Screen_Capture::GetActiveWindow();
 
+    if (true) {
+        return 0;
+    }
+
     std::srand(std::time(nullptr));
     std::cout << "Starting Capture Demo/Test" << std::endl;
     std::cout << "Testing captured monitor bounds check" << std::endl;

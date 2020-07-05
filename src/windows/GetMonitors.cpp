@@ -25,9 +25,9 @@ namespace Screen_Capture {
         return 1.0f;
     }
 
-    std::vector<Monitor> GetMonitors()
+    std::shared_ptr<std::vector<Monitor>> GetMonitors()
     {
-        std::vector<Monitor> ret;
+        std::shared_ptr<std::vector<Monitor>> ret = std::make_shared<std::vector<Monitor>>();
 
         IDXGIAdapter *pAdapter = nullptr;
         IDXGIFactory *pFactory = nullptr;
@@ -52,7 +52,7 @@ namespace Screen_Capture {
                     auto scale = scaleFromDpi(xdpi);
 
                     bool flipSides = desc.Rotation == DXGI_MODE_ROTATION_ROTATE90 || desc.Rotation == DXGI_MODE_ROTATION_ROTATE270;
-                    ret.push_back(CreateMonitor(static_cast<int>(ret.size()), j, i, flipSides ? devMode.dmPelsWidth : devMode.dmPelsHeight,
+                    ret->emplace_back(CreateMonitor(static_cast<int>(ret->size()), j, i, flipSides ? devMode.dmPelsWidth : devMode.dmPelsHeight,
                                                 flipSides ? devMode.dmPelsHeight : devMode.dmPelsWidth, devMode.dmPosition.x, devMode.dmPosition.y,
                                                 name, scale));
                 }

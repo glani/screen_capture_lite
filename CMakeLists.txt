@@ -8,13 +8,15 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(BUILD_SHARED_LIBS "Build shared library" OFF)
 option(BUILD_EXAMPLE "Build example" ON)
 
-if (MSVC)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
-else ()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic")
-endif ()
 
 if (WIN32)
+    if (MSVC)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
+    else ()
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic")
+        add_definitions("-DUNICODE -D_UNICODE" )
+        add_definitions("-D_WIN32_WINNT=0x0600" )
+    endif ()
     set(SCREEN_CAPTURE_PLATFORM_SRC
             src/windows/GetWindows.cpp
             src/windows/GetMonitors.cpp
@@ -32,7 +34,10 @@ if (WIN32)
             src/windows/SyncRunner.cpp
             include/windows/GDIHelpers.h
             src/windows/DXUtilsHolder.cpp
-            include/windows/DXUtilsHolder.h)
+            include/windows/DXUtilsHolder.h
+            src/windows/stringhelper.cpp
+            src/windows/stringhelper.h
+            )
     set(SCREEN_CAPTURE_PLATFORM_INC
             include/windows
             )
@@ -77,7 +82,8 @@ else ()
             src/linux/GetMonitors.cpp
             src/linux/GetWindows.cpp
             src/linux/ThreadRunner.cpp
-            src/linux/SyncRunner.cpp)
+            src/linux/SyncRunner.cpp
+            )
     find_package(X11 REQUIRED)
     if (!X11_XTest_FOUND)
         message(FATAL_ERROR "X11 extensions are required, but not found!")
@@ -109,7 +115,7 @@ add_library(${PROJECT_NAME}
 if (${BUILD_SHARED_LIBS})
     set_target_properties(${PROJECT_NAME} PROPERTIES DEFINE_SYMBOL SC_LITE_DLL)
     if (WIN32)
-        target_link_libraries(${PROJECT_NAME} ${COMMON_LIBRARIES} Dwmapi)
+        target_link_libraries(${PROJECT_NAME} ${COMMON_LIBRARIES} Dwmapi Psapi)
         install(FILES $<TARGET_PDB_FILE:${PROJECT_NAME}> DESTINATION bin OPTIONAL)
     elseif (APPLE)
         find_package(Threads REQUIRED)
@@ -164,9 +170,9 @@ enable_testing()
 
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    if (LINUX OR APPLE)
+#    if (LINUX OR APPLE)
         add_subdirectory(Example)
-    endif ()
+#    endif ()
 endif (CMAKE_BUILD_TYPE STREQUAL "Debug")
 
 
