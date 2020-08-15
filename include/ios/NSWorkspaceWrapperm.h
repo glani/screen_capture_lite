@@ -4,5 +4,8 @@
 
 @interface NSWorkspaceWrapper : NSObject
 - (void)Init;
-- (size_t)determineFrontmostApplicationPID;
+- (CFDictionaryRef)determineFrontmostApplication;
+- (void) releaseFrontmostApplication:(CFDictionaryRef) query;
+- (NSArray*) determineApplicationValues;
+- (void) releaseApplicationValues:(NSArray*) values;
 @end

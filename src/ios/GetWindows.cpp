@@ -1,15 +1,11 @@
 #include "ScreenCapture.h"
-#include "internal/SCCommon.h"
 #include <algorithm>
-#include <string>
-#include "TargetConditionals.h"
 #include <ApplicationServices/ApplicationServices.h>
-#include <iostream>
+#include <map>
 #include "ios/NSWorkspaceWrapper.h"
 
 namespace SL {
     namespace Screen_Capture {
-
         std::shared_ptr<std::string> getString(const CFStringRef &value);
 
         void determineScaleValues(float &xscale, float &yscale);
@@ -22,36 +18,55 @@ namespace SL {
             determineScaleValues(xscale, yscale);
 
             std::unique_ptr<NSWorkspaceWrapper> ptrWrapper(new NSWorkspaceWrapper());
-            size_t pid = ptrWrapper->determineFrontmostApplicationPID();
+            auto allActiveApps = ptrWrapper->determineApplicationValues();
+
+            CFDictionaryRef dictTopMost = ptrWrapper->determineFrontmostApplication();
+            CFNumberRef topMostPID  = static_cast<CFNumberRef>(CFDictionaryGetValue (dictTopMost, kTopMostPID));
+            int pid = 0;
+            if (topMostPID != NULL) {
+                CFNumberGetValue(topMostPID, kCFNumberIntType, &pid);
+            }
+
             int option = kCGWindowListOptionOnScreenOnly;
             auto windowList = CGWindowListCopyWindowInfo(option, kCGNullWindowID);
             std::shared_ptr<Window> ret; // = std::make_shared<Window>();
             CFIndex numWindows = CFArrayGetCount(windowList);
             for (int i = 0; i < (int) numWindows; i++) {
                 auto dict = static_cast<CFDictionaryRef>(CFArrayGetValueAtIndex(windowList, i));
-
-                auto windowOwnerPID = static_cast<CFNumberRef>(CFDictionaryGetValue(dict, kCGWindowOwnerPID));
-                size_t windowPid;
-                if (windowOwnerPID != NULL && CFNumberGetValue(windowOwnerPID, kCFNumberSInt32Type, &windowPid)) {
+                auto windowOwnerPID  = static_cast<CFNumberRef>(CFDictionaryGetValue (dict, kCGWindowOwnerPID));
+                int windowPid;
+                if (windowOwnerPID != NULL && CFNumberGetValue(windowOwnerPID, kCFNumberIntType, &windowPid)) {
+                    if (allActiveApps->find(windowPid) == allActiveApps->end()) {
+                        continue;
+                    }
                     if (pid == windowPid) {
                         auto w = getWindow(dict, xscale, yscale);
                         if (w) {
                             ret = w;
+                            CFStringRef localizedName  = (CFStringRef)CFDictionaryGetValue (dictTopMost, kTopMostLocalizedName);
+                            if (localizedName != NULL) {
+                                WindowAttribute attributeName;
+                                attributeName.Code = std::string("res_localized_name");
+                                attributeName.Value = *getString(localizedName);
+                                w->Attributes.emplace_back(attributeName);
+                            }
                             break;
                         }
                     }
-
                 }
             }
             CFRelease(windowList);
+            ptrWrapper->releaseFrontmostApplication(dictTopMost);
             return ret;
         }
-
 
         std::shared_ptr<std::vector<Window>> GetWindows() {
             auto xscale = 1.0f;
             auto yscale = 1.0f;
             determineScaleValues(xscale, yscale);
+
+            std::unique_ptr<NSWorkspaceWrapper> ptrWrapper(new NSWorkspaceWrapper());
+            auto allActiveApps = ptrWrapper->determineApplicationValues();
 
             int option = kCGWindowListOptionAll;
             auto windowList = CGWindowListCopyWindowInfo(option, kCGNullWindowID);
@@ -59,6 +74,15 @@ namespace SL {
             CFIndex numWindows = CFArrayGetCount(windowList);
             for (int i = 0; i < (int) numWindows; i++) {
                 auto dict = static_cast<CFDictionaryRef>(CFArrayGetValueAtIndex(windowList, i));
+                auto windowOwnerPID  = static_cast<CFNumberRef>(CFDictionaryGetValue (dict, kCGWindowOwnerPID));
+                int windowPid;
+                if (windowOwnerPID != NULL && CFNumberGetValue(windowOwnerPID, kCFNumberIntType, &windowPid)) {
+                    if (allActiveApps->find(windowPid) == allActiveApps->end()) {
+                        continue;
+                    }
+                } else {
+                    continue;
+                }
                 auto w = getWindow(dict, xscale, yscale);
                 if (w) {
                     ret->emplace_back(*w);
@@ -68,7 +92,10 @@ namespace SL {
             return ret;
         }
 
-        std::shared_ptr<Window> getWindow(const __CFDictionary *dict, float xscale, float yscale) {
+        std::shared_ptr<Window> getWindow(
+            const __CFDictionary *dict,
+            float xscale,
+            float yscale) {
 
             uint32_t windowid = 0;
             auto cfwindowname = static_cast<CFStringRef>(CFDictionaryGetValue(dict, kCGWindowName));

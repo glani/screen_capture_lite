@@ -254,8 +254,22 @@ void createwindowgrabber()
 int main()
 {
     auto windows = SL::Screen_Capture::GetWindows();
+    windows = SL::Screen_Capture::GetWindows();
+    windows = SL::Screen_Capture::GetWindows();
+    windows = SL::Screen_Capture::GetWindows();
+    windows = SL::Screen_Capture::GetWindows();
+    windows = SL::Screen_Capture::GetWindows();
+    windows = SL::Screen_Capture::GetWindows();
+
 
     auto activeWindow = SL::Screen_Capture::GetActiveWindow();
+    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    activeWindow = SL::Screen_Capture::GetActiveWindow();
 
     if (true) {
         return 0;
