@@ -17,6 +17,10 @@
 #define LODEPNG_COMPILE_PNG
 #define LODEPNG_COMPILE_DISK
 #include "lodepng.h"
+
+#ifndef WINDOWS
+#include <unistd.h>
+#endif
 /////////////////////////////////////////////////////////////////////////
 
 void ExtractAndConvertToRGBA(const SL::Screen_Capture::Image &img, unsigned char *dst, size_t dst_size)
@@ -271,9 +275,15 @@ int main()
     activeWindow = SL::Screen_Capture::GetActiveWindow();
     activeWindow = SL::Screen_Capture::GetActiveWindow();
 
-    if (true) {
-        return 0;
+#ifndef WINDOWS
+    while (true) {
+        activeWindow = SL::Screen_Capture::GetActiveWindow();
+        windows = SL::Screen_Capture::GetWindows();
+        usleep(100000);
     }
+#endif
+
+
 
     std::srand(std::time(nullptr));
     std::cout << "Starting Capture Demo/Test" << std::endl;
