@@ -109,9 +109,9 @@ namespace SL {
             windowPtr->Size.y = static_cast<int>(rect.size.height * yscale);
 
             auto windowOwnerPID  = static_cast<CFNumberRef>(CFDictionaryGetValue (dict, kCGWindowOwnerPID));
-            int windowPid;
+            uint32_t windowPid;
             if (windowOwnerPID != NULL && CFNumberGetValue(windowOwnerPID, kCFNumberIntType, &windowPid)) {
-                windowPtr->OwnerHandle = windowPid;
+                windowPtr->OwnerHandle = static_cast<size_t>( windowPid);
             }
 
             auto ownerName = static_cast<CFStringRef>(CFDictionaryGetValue(dict, kCGWindowOwnerName));
