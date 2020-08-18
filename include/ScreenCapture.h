@@ -34,10 +34,10 @@ namespace Screen_Capture {
     };
     struct SC_LITE_EXTERN Window {
         size_t Handle;
+        size_t OwnerHandle;
         Point Position;
 
         Point Size;
-        // Name will always be lower case. It is converted to lower case internally by the library for comparisons
         std::string Name;
 
         std::vector<WindowAttribute> Attributes;

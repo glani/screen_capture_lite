@@ -18,9 +18,6 @@ namespace SL {
             determineScaleValues(xscale, yscale);
 
             std::unique_ptr<NSWorkspaceWrapper> ptrWrapper(new NSWorkspaceWrapper());
-            auto allActiveApps = std::shared_ptr<std::map<int, struct ApplicationData>>();
-            // segmentation fault 11
-            // auto allActiveApps = ptrWrapper->determineApplicationValues();
 
             CFDictionaryRef dictTopMost = ptrWrapper->determineFrontmostApplication();
             CFNumberRef topMostPID  = static_cast<CFNumberRef>(CFDictionaryGetValue (dictTopMost, kTopMostPID));
@@ -38,9 +35,6 @@ namespace SL {
                 auto windowOwnerPID  = static_cast<CFNumberRef>(CFDictionaryGetValue (dict, kCGWindowOwnerPID));
                 int windowPid;
                 if (windowOwnerPID != NULL && CFNumberGetValue(windowOwnerPID, kCFNumberIntType, &windowPid)) {
-                    if (allActiveApps && allActiveApps->find(windowPid) == allActiveApps->end()) {
-                        continue;
-                    }
                     if (pid == windowPid) {
                         auto w = getWindow(dict, xscale, yscale);
                         if (w) {
@@ -58,8 +52,6 @@ namespace SL {
                 }
             }
             CFRelease(windowList);
-            // segmentation fault 11
-            // ptrWrapper->releaseFrontmostApplication(dictTopMost);
             return ret;
         }
 
@@ -69,9 +61,6 @@ namespace SL {
             determineScaleValues(xscale, yscale);
 
             std::unique_ptr<NSWorkspaceWrapper> ptrWrapper(new NSWorkspaceWrapper());
-            auto allActiveApps = std::shared_ptr<std::map<int, struct ApplicationData>>();
-            // segmentation fault 11
-            // ptrWrapper->determineApplicationValues();
 
             int option = kCGWindowListOptionAll;
             auto windowList = CGWindowListCopyWindowInfo(option, kCGNullWindowID);
@@ -79,23 +68,13 @@ namespace SL {
             CFIndex numWindows = CFArrayGetCount(windowList);
             for (int i = 0; i < (int) numWindows; i++) {
                 auto dict = static_cast<CFDictionaryRef>(CFArrayGetValueAtIndex(windowList, i));
-                auto windowOwnerPID  = static_cast<CFNumberRef>(CFDictionaryGetValue (dict, kCGWindowOwnerPID));
-                int windowPid;
-                if (windowOwnerPID != NULL && CFNumberGetValue(windowOwnerPID, kCFNumberIntType, &windowPid)) {
-                    if (allActiveApps && allActiveApps->find(windowPid) == allActiveApps->end()) {
-                        continue;
-                    }
-                } else {
-                    continue;
-                }
                 auto w = getWindow(dict, xscale, yscale);
                 if (w) {
                     ret->emplace_back(*w);
                 }
             }
             CFRelease(windowList);
-            // segmentation fault 11
-            // ptrWrapper->releaseFrontmostApplication(dictTopMost);
+
             return ret;
         }
 
@@ -128,6 +107,12 @@ namespace SL {
 
             windowPtr->Size.x = static_cast<int>(rect.size.width * xscale);
             windowPtr->Size.y = static_cast<int>(rect.size.height * yscale);
+
+            auto windowOwnerPID  = static_cast<CFNumberRef>(CFDictionaryGetValue (dict, kCGWindowOwnerPID));
+            int windowPid;
+            if (windowOwnerPID != NULL && CFNumberGetValue(windowOwnerPID, kCFNumberIntType, &windowPid)) {
+                windowPtr->OwnerHandle = windowPid;
+            }
 
             auto ownerName = static_cast<CFStringRef>(CFDictionaryGetValue(dict, kCGWindowOwnerName));
             if (ownerName != NULL) {
