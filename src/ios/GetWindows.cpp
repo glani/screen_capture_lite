@@ -6,6 +6,7 @@
 
 namespace SL {
     namespace Screen_Capture {
+        static NSWorkspaceWrapper ptrWrapper;
         std::shared_ptr<std::string> getString(const CFStringRef &value);
 
         void determineScaleValues(float &xscale, float &yscale);
@@ -15,11 +16,11 @@ namespace SL {
         std::shared_ptr<Window> GetActiveWindow() {
             auto xscale = 1.0f;
             auto yscale = 1.0f;
-            determineScaleValues(xscale, yscale);
+//            determineScaleValues(xscale, yscale);
 
-            std::unique_ptr<NSWorkspaceWrapper> ptrWrapper(new NSWorkspaceWrapper());
+//            std::unique_ptr<NSWorkspaceWrapper> ptrWrapper(new NSWorkspaceWrapper());
 
-            CFDictionaryRef dictTopMost = ptrWrapper->determineFrontmostApplication();
+            CFDictionaryRef dictTopMost = ptrWrapper.determineFrontmostApplication();
             CFNumberRef topMostPID  = static_cast<CFNumberRef>(CFDictionaryGetValue (dictTopMost, kTopMostPID));
             int pid = 0;
             if (topMostPID != NULL) {
@@ -39,28 +40,27 @@ namespace SL {
                         auto w = getWindow(dict, xscale, yscale);
                         if (w) {
                             ret = w;
-                            CFStringRef localizedName  = (CFStringRef)CFDictionaryGetValue (dictTopMost, kTopMostLocalizedName);
-                            if (localizedName != NULL) {
-                                WindowAttribute attributeName;
-                                attributeName.Code = std::string("res_localized_name");
-                                attributeName.Value = *getString(localizedName);
-                                w->Attributes.emplace_back(attributeName);
-                            }
+//                            CFStringRef localizedName  = (CFStringRef)CFDictionaryGetValue (dictTopMost, kTopMostLocalizedName);
+//                            if (localizedName != NULL) {
+//                                WindowAttribute attributeName;
+//                                attributeName.Code = std::string("res_localized_name");
+//                                attributeName.Value = *getString(localizedName);
+//                                w->Attributes.emplace_back(attributeName);
+//                            }
                             break;
                         }
                     }
                 }
             }
             CFRelease(windowList);
+            ptrWrapper.releaseFrontmostApplication(dictTopMost);
             return ret;
         }
 
         std::shared_ptr<std::vector<Window>> GetWindows() {
             auto xscale = 1.0f;
             auto yscale = 1.0f;
-            determineScaleValues(xscale, yscale);
-
-            std::unique_ptr<NSWorkspaceWrapper> ptrWrapper(new NSWorkspaceWrapper());
+//            determineScaleValues(xscale, yscale);
 
             int option = kCGWindowListOptionAll;
             auto windowList = CGWindowListCopyWindowInfo(option, kCGNullWindowID);
@@ -147,7 +147,7 @@ namespace SL {
         void determineScaleValues(float &xscale, float &yscale) {
             CGDisplayCount count = 0;
             CGGetActiveDisplayList(0, 0, &count);
-            std::__1::vector<CGDirectDisplayID> displays;
+            std::vector<CGDirectDisplayID> displays;
             displays.resize(count);
             CGGetActiveDisplayList(count, displays.data(), &count);
 

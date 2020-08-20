@@ -30,33 +30,83 @@ extern const CFStringRef kTopMostLocalizedName = CFSTR( "kTopMostLocalizedName" 
 }
 
 - (CFDictionaryRef) determineFrontmostApplication {
-    auto frontmostApplication=[[NSWorkspace sharedWorkspace] frontmostApplication];
     CFMutableDictionaryRef query =
             CFDictionaryCreateMutable(NULL,
-                                      2,
+                                      0,
                                       &kCFTypeDictionaryKeyCallBacks,
                                       &kCFTypeDictionaryValueCallBacks);
-    if (frontmostApplication) {
-        auto pid = frontmostApplication.processIdentifier;
-        CFStringRef localizedName = CFStringCreateWithCString
-                (
-                        ( CFAllocatorRef )NULL,
-                        [frontmostApplication localizedName].UTF8String,
-                        kCFStringEncodingUTF8
-                );
-        CFNumberRef processIdentifier = CFNumberCreate(
-                ( CFAllocatorRef )NULL,
-                kCFNumberIntType,
-                &pid
-                );
-        CFDictionarySetValue(query, kTopMostPID,
-                             processIdentifier);
-        CFDictionarySetValue(query, kTopMostLocalizedName,
-                             localizedName);
+    @autoreleasepool {
+        auto frontmostApplication= [[NSWorkspace sharedWorkspace] frontmostApplication];
+        if (frontmostApplication) {
+            auto pid = frontmostApplication.processIdentifier;
+            CFStringRef localizedName = CFStringCreateWithCString
+                    (
+                            ( CFAllocatorRef )NULL,
+                            [frontmostApplication localizedName].UTF8String,
+                            kCFStringEncodingUTF8
+                    );
+            CFNumberRef processIdentifier = CFNumberCreate(
+                    ( CFAllocatorRef )NULL,
+                    kCFNumberIntType,
+                    &pid
+                    );
+            CFDictionarySetValue(query, kTopMostPID,
+                                 processIdentifier);
+            CFDictionarySetValue(query, kTopMostLocalizedName,
+                                 localizedName);
 
-        CFRelease( localizedName );
-        CFRelease( processIdentifier );
+            CFRelease( localizedName );
+            CFRelease( processIdentifier );
+        }
+
     }
+//    NSArray *appsArray = [[NSWorkspace sharedWorkspace] runningApplications];
+//    for (NSRunningApplication *a in appsArray) {
+//        if (a.active) {
+//            auto pid = a.processIdentifier;
+//            CFStringRef localizedName = CFStringCreateWithCString
+//                    (
+//                            ( CFAllocatorRef )NULL,
+//                            [a localizedName].UTF8String,
+//                            kCFStringEncodingUTF8
+//                    );
+//            CFNumberRef processIdentifier = CFNumberCreate(
+//                    ( CFAllocatorRef )NULL,
+//                    kCFNumberIntType,
+//                    &pid
+//            );
+//            CFDictionarySetValue(query, kTopMostPID,
+//                                 processIdentifier);
+//            CFDictionarySetValue(query, kTopMostLocalizedName,
+//                                 localizedName);
+//
+//            CFRelease( localizedName );
+//            CFRelease( processIdentifier );
+//            break;
+//        }
+//    }
+//    [appsArray release];
+//    if (frontmostApplication) {
+//        auto pid = frontmostApplication.processIdentifier;
+//        CFStringRef localizedName = CFStringCreateWithCString
+//                (
+//                        ( CFAllocatorRef )NULL,
+//                        [frontmostApplication localizedName].UTF8String,
+//                        kCFStringEncodingUTF8
+//                );
+//        CFNumberRef processIdentifier = CFNumberCreate(
+//                ( CFAllocatorRef )NULL,
+//                kCFNumberIntType,
+//                &pid
+//                );
+//        CFDictionarySetValue(query, kTopMostPID,
+//                             processIdentifier);
+//        CFDictionarySetValue(query, kTopMostLocalizedName,
+//                             localizedName);
+//
+//        CFRelease( localizedName );
+//        CFRelease( processIdentifier );
+//    }
     return query;
 }
 
