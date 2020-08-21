@@ -7,6 +7,7 @@
 namespace SL {
     namespace Screen_Capture {
         static NSWorkspaceWrapper ptrWrapper;
+
         std::shared_ptr<std::string> getString(const CFStringRef &value);
 
         void determineScaleValues(float &xscale, float &yscale);
@@ -16,12 +17,10 @@ namespace SL {
         std::shared_ptr<Window> GetActiveWindow() {
             auto xscale = 1.0f;
             auto yscale = 1.0f;
-//            determineScaleValues(xscale, yscale);
-
-//            std::unique_ptr<NSWorkspaceWrapper> ptrWrapper(new NSWorkspaceWrapper());
+            determineScaleValues(xscale, yscale);
 
             CFDictionaryRef dictTopMost = ptrWrapper.determineFrontmostApplication();
-            CFNumberRef topMostPID  = static_cast<CFNumberRef>(CFDictionaryGetValue (dictTopMost, kTopMostPID));
+            CFNumberRef topMostPID = static_cast<CFNumberRef>(CFDictionaryGetValue(dictTopMost, kTopMostPID));
             int pid = 0;
             if (topMostPID != NULL) {
                 CFNumberGetValue(topMostPID, kCFNumberIntType, &pid);
@@ -33,20 +32,24 @@ namespace SL {
             CFIndex numWindows = CFArrayGetCount(windowList);
             for (int i = 0; i < (int) numWindows; i++) {
                 auto dict = static_cast<CFDictionaryRef>(CFArrayGetValueAtIndex(windowList, i));
-                auto windowOwnerPID  = static_cast<CFNumberRef>(CFDictionaryGetValue (dict, kCGWindowOwnerPID));
+                auto windowOwnerPID = static_cast<CFNumberRef>(CFDictionaryGetValue(dict, kCGWindowOwnerPID));
                 int windowPid;
                 if (windowOwnerPID != NULL && CFNumberGetValue(windowOwnerPID, kCFNumberIntType, &windowPid)) {
                     if (pid == windowPid) {
                         auto w = getWindow(dict, xscale, yscale);
                         if (w) {
                             ret = w;
-//                            CFStringRef localizedName  = (CFStringRef)CFDictionaryGetValue (dictTopMost, kTopMostLocalizedName);
-//                            if (localizedName != NULL) {
-//                                WindowAttribute attributeName;
-//                                attributeName.Code = std::string("res_localized_name");
-//                                attributeName.Value = *getString(localizedName);
-//                                w->Attributes.emplace_back(attributeName);
-//                            }
+                            CFStringRef localizedName = (CFStringRef) CFDictionaryGetValue(dictTopMost,
+                                                                                           kTopMostLocalizedName);
+                            if (localizedName != NULL) {
+                                auto v = getString(localizedName);
+                                if (v) {
+                                    WindowAttribute attributeName;
+                                    attributeName.Code = std::string("res_localized_name");
+                                    attributeName.Value = *v;
+                                    w->Attributes.emplace_back(attributeName);
+                                }
+                            }
                             break;
                         }
                     }
@@ -60,7 +63,7 @@ namespace SL {
         std::shared_ptr<std::vector<Window>> GetWindows() {
             auto xscale = 1.0f;
             auto yscale = 1.0f;
-//            determineScaleValues(xscale, yscale);
+            determineScaleValues(xscale, yscale);
 
             int option = kCGWindowListOptionAll;
             auto windowList = CGWindowListCopyWindowInfo(option, kCGNullWindowID);
@@ -68,9 +71,11 @@ namespace SL {
             CFIndex numWindows = CFArrayGetCount(windowList);
             for (int i = 0; i < (int) numWindows; i++) {
                 auto dict = static_cast<CFDictionaryRef>(CFArrayGetValueAtIndex(windowList, i));
-                auto w = getWindow(dict, xscale, yscale);
-                if (w) {
-                    ret->emplace_back(*w);
+                if (dict != NULL) {
+                    auto w = getWindow(dict, xscale, yscale);
+                    if (w) {
+                        ret->emplace_back(*w);
+                    }
                 }
             }
             CFRelease(windowList);
@@ -79,9 +84,9 @@ namespace SL {
         }
 
         std::shared_ptr<Window> getWindow(
-            const __CFDictionary *dict,
-            float xscale,
-            float yscale) {
+                const __CFDictionary *dict,
+                float xscale,
+                float yscale) {
 
             uint32_t windowid = 0;
             auto cfwindowname = static_cast<CFStringRef>(CFDictionaryGetValue(dict, kCGWindowName));
@@ -93,7 +98,7 @@ namespace SL {
             if (windowName == NULL) {
                 return std::shared_ptr<Window>();
             }
-            auto windowPtr = std::make_shared<Window>((Window){});
+            auto windowPtr = std::make_shared<Window>((Window) {});
             windowPtr->Name = *windowName;
             CFNumberGetValue(static_cast<CFNumberRef>(CFDictionaryGetValue(dict, kCGWindowNumber)),
                              kCFNumberIntType, &windowid);
@@ -108,7 +113,7 @@ namespace SL {
             windowPtr->Size.x = static_cast<int>(rect.size.width * xscale);
             windowPtr->Size.y = static_cast<int>(rect.size.height * yscale);
 
-            auto windowOwnerPID  = static_cast<CFNumberRef>(CFDictionaryGetValue (dict, kCGWindowOwnerPID));
+            auto windowOwnerPID = static_cast<CFNumberRef>(CFDictionaryGetValue(dict, kCGWindowOwnerPID));
             uint32_t windowPid;
 
             if (windowOwnerPID != NULL && CFNumberGetValue(windowOwnerPID, kCFNumberIntType, &windowPid)) {
@@ -119,16 +124,18 @@ namespace SL {
 
             auto ownerName = static_cast<CFStringRef>(CFDictionaryGetValue(dict, kCGWindowOwnerName));
             if (ownerName != NULL) {
-                WindowAttribute attributeClass;
-                attributeClass.Code = std::string("res_class");
-                const std::string &ownerNameValue = *getString(ownerName);
-                attributeClass.Value = ownerNameValue;
-                windowPtr->Attributes.emplace_back(attributeClass);
+                auto ownerNameValue = getString(ownerName);
+                if (ownerNameValue) {
+                    WindowAttribute attributeClass;
+                    attributeClass.Code = std::string("res_class");
+                    attributeClass.Value = *ownerNameValue;
+                    windowPtr->Attributes.emplace_back(attributeClass);
 
-                WindowAttribute attributeName;
-                attributeName.Code = std::string("res_name");
-                attributeName.Value = ownerNameValue;
-                windowPtr->Attributes.emplace_back(attributeName);
+                    WindowAttribute attributeName;
+                    attributeName.Code = std::string("res_name");
+                    attributeName.Value = *ownerNameValue;
+                    windowPtr->Attributes.emplace_back(attributeName);
+                }
             }
 
             WindowAttribute attributeVisible;
@@ -178,13 +185,14 @@ namespace SL {
         std::shared_ptr<std::string> getString(const CFStringRef &value) {
             CFIndex bufferSize = 2 * (CFStringGetLength(value) + 1);
             char *buffer = new char[bufferSize];
-            std::unique_ptr<char> _(buffer);
+
             std::string result;
             if (CFStringGetCString(value, buffer, bufferSize, kCFStringEncodingUTF8)) {
-                auto basicString = std::string(
-                        buffer);
-                return std::make_shared<std::string>(basicString);
+                auto result = std::make_shared<std::string>(buffer);
+                delete[] buffer;
+                return result;
             }
+            delete[] buffer;
             return std::shared_ptr<std::string>();
         }
     }
