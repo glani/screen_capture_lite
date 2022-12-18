@@ -26,19 +26,31 @@ namespace SL {
                 CFNumberGetValue(topMostPID, kCFNumberIntType, &pid);
             }
 
-            int option = kCGWindowListOptionOnScreenOnly;
+            int option = kCGWindowListOptionAll;
             auto windowList = CGWindowListCopyWindowInfo(option, kCGNullWindowID);
             std::shared_ptr<Window> ret; // = std::make_shared<Window>();
             CFIndex numWindows = CFArrayGetCount(windowList);
             for (int i = 0; i < (int) numWindows; i++) {
                 auto dict = static_cast<CFDictionaryRef>(CFArrayGetValueAtIndex(windowList, i));
                 auto windowOwnerPID = static_cast<CFNumberRef>(CFDictionaryGetValue(dict, kCGWindowOwnerPID));
+
                 int windowPid;
                 if (windowOwnerPID != NULL && CFNumberGetValue(windowOwnerPID, kCFNumberIntType, &windowPid)) {
                     if (pid == windowPid) {
                         auto w = getWindow(dict, xscale, yscale);
                         if (w) {
                             ret = w;
+                            CFStringRef absoluteUrlString = (CFStringRef) CFDictionaryGetValue(dictTopMost,
+                                                                                          kAbsoluteUrlString);
+                            if (absoluteUrlString != NULL) {
+                                auto v = getString(absoluteUrlString);
+                                WindowAttribute attributeName;
+                                attributeName.Code = std::string("res_start_absolute_url");
+                                attributeName.Value = *v;
+                                w->Attributes.emplace_back(attributeName);
+
+                            }
+
                             CFStringRef localizedName = (CFStringRef) CFDictionaryGetValue(dictTopMost,
                                                                                            kTopMostLocalizedName);
                             if (localizedName != NULL) {
@@ -50,7 +62,7 @@ namespace SL {
                                     w->Attributes.emplace_back(attributeName);
                                 }
                             }
-                            break;
+//                            break;
                         }
                     }
                 }
@@ -89,14 +101,15 @@ namespace SL {
                 float yscale) {
 
             uint32_t windowid = 0;
-            auto cfwindowname = static_cast<CFStringRef>(CFDictionaryGetValue(dict, kCGWindowName));
-            if (cfwindowname == NULL) {
-                return std::shared_ptr<Window>();
-            }
-
-            auto windowName = getString(cfwindowname);
-            if (windowName == NULL) {
-                return std::shared_ptr<Window>();
+            auto cfWindowName = static_cast<CFStringRef>(CFDictionaryGetValue(dict, kCGWindowName));
+            std::shared_ptr<std::string> windowName;
+            if (cfWindowName != NULL) {
+                windowName = getString(cfWindowName);
+                if (windowName == NULL) {
+                    return std::shared_ptr<Window>();
+                }
+            } else {
+                windowName = std::make_shared<std::string>("");
             }
             auto windowPtr = std::make_shared<Window>((Window) {});
             windowPtr->Name = *windowName;

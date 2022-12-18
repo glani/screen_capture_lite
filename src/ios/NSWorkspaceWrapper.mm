@@ -3,6 +3,7 @@
 #include "NSWorkspaceWrapperm.h"
 
 extern const CFStringRef kTopMostPID = CFSTR( "kTopMostPID" );
+extern const CFStringRef kAbsoluteUrlString = CFSTR( "kAbsoluteUrlString" );
 extern const CFStringRef kTopMostLocalizedName = CFSTR( "kTopMostLocalizedName" );
 
 @implementation NSWorkspaceWrapper
@@ -37,8 +38,22 @@ extern const CFStringRef kTopMostLocalizedName = CFSTR( "kTopMostLocalizedName" 
                                       &kCFTypeDictionaryValueCallBacks);
     @autoreleasepool {
         auto frontmostApplication= [[NSWorkspace sharedWorkspace] frontmostApplication];
+
         if (frontmostApplication) {
             auto pid = frontmostApplication.processIdentifier;
+            auto executableURL = [frontmostApplication executableURL];
+            if (executableURL) {
+                CFStringRef absoluteString = CFStringCreateWithCString
+                    (
+                            ( CFAllocatorRef )NULL,
+                            [executableURL absoluteString].UTF8String,
+                            kCFStringEncodingUTF8
+                    );
+                CFDictionarySetValue(query, kAbsoluteUrlString,
+                                 absoluteString);
+
+                CFRelease( absoluteString );
+            }
             CFStringRef localizedName = CFStringCreateWithCString
                     (
                             ( CFAllocatorRef )NULL,
@@ -60,53 +75,7 @@ extern const CFStringRef kTopMostLocalizedName = CFSTR( "kTopMostLocalizedName" 
         }
 
     }
-//    NSArray *appsArray = [[NSWorkspace sharedWorkspace] runningApplications];
-//    for (NSRunningApplication *a in appsArray) {
-//        if (a.active) {
-//            auto pid = a.processIdentifier;
-//            CFStringRef localizedName = CFStringCreateWithCString
-//                    (
-//                            ( CFAllocatorRef )NULL,
-//                            [a localizedName].UTF8String,
-//                            kCFStringEncodingUTF8
-//                    );
-//            CFNumberRef processIdentifier = CFNumberCreate(
-//                    ( CFAllocatorRef )NULL,
-//                    kCFNumberIntType,
-//                    &pid
-//            );
-//            CFDictionarySetValue(query, kTopMostPID,
-//                                 processIdentifier);
-//            CFDictionarySetValue(query, kTopMostLocalizedName,
-//                                 localizedName);
-//
-//            CFRelease( localizedName );
-//            CFRelease( processIdentifier );
-//            break;
-//        }
-//    }
-//    [appsArray release];
-//    if (frontmostApplication) {
-//        auto pid = frontmostApplication.processIdentifier;
-//        CFStringRef localizedName = CFStringCreateWithCString
-//                (
-//                        ( CFAllocatorRef )NULL,
-//                        [frontmostApplication localizedName].UTF8String,
-//                        kCFStringEncodingUTF8
-//                );
-//        CFNumberRef processIdentifier = CFNumberCreate(
-//                ( CFAllocatorRef )NULL,
-//                kCFNumberIntType,
-//                &pid
-//                );
-//        CFDictionarySetValue(query, kTopMostPID,
-//                             processIdentifier);
-//        CFDictionarySetValue(query, kTopMostLocalizedName,
-//                             localizedName);
-//
-//        CFRelease( localizedName );
-//        CFRelease( processIdentifier );
-//    }
+
     return query;
 }
 
@@ -130,11 +99,11 @@ namespace SL {
 
             ~NSWorkspaceWrapperImpl() {
                 if (ptr) {
-                    [ptr release];
                     auto r = CFGetRetainCount(ptr);
                     while (r != 1) {
                         r = CFGetRetainCount(ptr);
                     }
+                    [ptr release];
                     ptr = nullptr;
                 }
             }
@@ -146,7 +115,6 @@ namespace SL {
             std::shared_ptr<std::map<int, struct ApplicationData>> determineApplicationValues() {
                 std::shared_ptr<std::map<int, struct ApplicationData>> data = std::make_shared<std::map<int, struct ApplicationData>>();
                 NSArray* values = [ptr determineApplicationValues];
-                NSArray *appsArray = [[NSWorkspace sharedWorkspace] runningApplications];
                 for (NSNumber *value in values) {
                     struct ApplicationData ad;
                     ad.pid = value.intValue;
@@ -187,6 +155,5 @@ namespace SL {
         void releaseFrontmostApplicationWrap(NSWorkspaceWrapperImpl *p, CFDictionaryRef query) {
             p->releaseFrontmostApplication(query);
         }
-
     }
 }

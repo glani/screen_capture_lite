@@ -83,7 +83,6 @@
     processed = self.nsframeprocessor->ok;
     __.unlock();
 
-    // std::cout << "Thread Id: " << std::this_thread::get_id() << std::endl;
     if (processed) {
         self.Working = false;
         return;

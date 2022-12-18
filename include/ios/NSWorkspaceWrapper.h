@@ -9,6 +9,7 @@
 #include <map>
 extern const CFStringRef kTopMostPID;
 extern const CFStringRef kTopMostLocalizedName;
+extern const CFStringRef kAbsoluteUrlString;
 
 namespace SL {
 namespace Screen_Capture {
