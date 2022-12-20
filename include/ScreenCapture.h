@@ -154,6 +154,9 @@ namespace Screen_Capture {
     // will return active window
     std::shared_ptr<Window> GetActiveWindow();
 
+    // request accessibility permissions
+    bool RequestAccessibilityPermissions();
+
     typedef std::function<void(const SL::Screen_Capture::Image &img, const Window &window)> WindowCaptureCallback;
     typedef std::function<void(const SL::Screen_Capture::Image &img, const Monitor &monitor)> ScreenCaptureCallback;
     typedef std::function<void(const SL::Screen_Capture::Image *img, const MousePoint &mousepoint)> MouseCallback;

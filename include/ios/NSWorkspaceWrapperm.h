@@ -5,7 +5,9 @@
 @interface NSWorkspaceWrapper : NSObject
 - (void)Init;
 - (CFDictionaryRef)determineFrontmostApplication;
-- (void) releaseFrontmostApplication:(CFDictionaryRef) query;
-- (NSArray*) determineApplicationValues;
-- (void) releaseApplicationValues:(NSArray*) values;
+- (Boolean)requestAccessibilityPermissions;
+- (void)releaseFrontmostApplication:(CFDictionaryRef)query;
+- (NSArray *)determineApplicationValues;
+- (NSArray *)determineWindowsByProcessId:(pid_t)pid;
+- (void)releaseApplicationValues:(NSArray *)values;
 @end

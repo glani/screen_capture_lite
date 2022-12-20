@@ -1,5 +1,4 @@
 #include "NSWorkspaceWrapper.h"
-#include <CoreFoundation/CoreFoundation.h>
 #include <map>
 
 namespace SL {
@@ -15,6 +14,18 @@ namespace SL {
 
         std::shared_ptr<std::map<int, struct ApplicationData>> NSWorkspaceWrapper::determineApplicationValues() {
             return determineApplicationValuesWrap(this->NSWorkspaceWrapperImpl_);
+        }
+
+        bool NSWorkspaceWrapper::requestAccessibilityPermissions() {
+            return requestAccessibilityPermissionsWrap(this->NSWorkspaceWrapperImpl_);
+        }
+
+        std::shared_ptr<std::vector<struct WindowData>> NSWorkspaceWrapper::determineWindows() {
+            return determineWindowsWrap(this->NSWorkspaceWrapperImpl_);
+        }
+
+        std::shared_ptr<std::vector<struct WindowData>> NSWorkspaceWrapper::determineWindows(const int pid) {
+            return determineWindowsWrap(this->NSWorkspaceWrapperImpl_, pid);
         }
 
     } // namespace Screen_Capture

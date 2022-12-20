@@ -1,30 +1,26 @@
-//
-// Created by Denis Esakov on 04.07.20.
-//
-
-#ifndef SIMPLE_SCREENSHOT_MAKER_NSWORKSPACEWRAPPER_H
-#define SIMPLE_SCREENSHOT_MAKER_NSWORKSPACEWRAPPER_H
-
+#pragma once
 #include <CoreFoundation/CoreFoundation.h>
 #include <map>
-extern const CFStringRef kTopMostPID;
-extern const CFStringRef kTopMostLocalizedName;
-extern const CFStringRef kAbsoluteUrlString;
+#include "NSWorkspaceWrapperShared.h"
+#include "NSWorkspaceWrapper.inc.h"
 
 namespace SL {
 namespace Screen_Capture {
     struct NSWorkspaceWrapperImpl;
-    struct ApplicationData {
-        int pid;
-    };
+    struct ApplicationData;
+    struct WindowData;
 
     NSWorkspaceWrapperImpl *CreateNSWorkspaceWrapperImpl();
 
     void DestroyNSWorkspaceWrapperImpl(NSWorkspaceWrapperImpl *p);
 
     CFDictionaryRef determineFrontmostApplicationWrap(NSWorkspaceWrapperImpl *p);
+    Boolean requestAccessibilityPermissionsWrap(NSWorkspaceWrapperImpl *p);
     void releaseFrontmostApplicationWrap(NSWorkspaceWrapperImpl *p, CFDictionaryRef query);
     std::shared_ptr<std::map<int, struct ApplicationData>> determineApplicationValuesWrap(NSWorkspaceWrapperImpl *p);
+    std::shared_ptr<std::vector<struct WindowData>> determineWindowsWrap(NSWorkspaceWrapperImpl *p, int pid);
+    std::shared_ptr<std::vector<struct WindowData>> determineWindowsWrap(NSWorkspaceWrapperImpl *p);
+
 
     class NSWorkspaceWrapper {
         NSWorkspaceWrapperImpl *NSWorkspaceWrapperImpl_ = nullptr;
@@ -36,11 +32,14 @@ namespace Screen_Capture {
 
         CFDictionaryRef determineFrontmostApplication();
 
+        bool requestAccessibilityPermissions();
+
         void releaseFrontmostApplication(CFDictionaryRef query);
 
         std::shared_ptr<std::map<int, struct ApplicationData>> determineApplicationValues();
+        std::shared_ptr<std::vector<struct WindowData>> determineWindows(int pid);
+        std::shared_ptr<std::vector<struct WindowData>> determineWindows();
     };
 } // namespace Screen_Capture
 } // namespace SL
 
-#endif // SIMPLE_SCREENSHOT_MAKER_NSWORKSPACEWRAPPER_H

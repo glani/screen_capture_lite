@@ -46,8 +46,10 @@ elseif (APPLE)
 
     set(SCREEN_CAPTURE_PLATFORM_SRC
             src/ios/GetWindows.cpp
+            src/ios/SCAccessibilityElement.m
             src/ios/NSMouseCapture.m
             include/ios/NSMouseCapture.h
+            include/ios/NSWorkspaceWrapper.inc.h
             src/ios/NSFrameProcessor.cpp
             src/ios/NSFrameProcessor.mm
             src/ios/NSFrameProcessorSync.cpp
@@ -57,6 +59,7 @@ elseif (APPLE)
             include/ios/NSFrameProcessorm.h
             include/ios/NSFrameProcessor.h
             src/ios/NSMouseProcessor.cpp
+            include/ios/SCAccessibilityElement.h
             include/ios/NSMouseProcessor.h
             src/ios/CGFrameProcessor.cpp
             include/ios/CGFrameProcessor.h
@@ -66,7 +69,10 @@ elseif (APPLE)
             src/ios/NSWorkspaceWrapper.mm
             src/ios/NSWorkspaceWrapper.cpp
             include/ios/NSWorkspaceWrapper.h
+            include/ios/NSWorkspaceWrapperShared.h
             include/ios/NSWorkspaceWrapperm.h
+            src/ios/Utils.cpp
+            include/ios/Utils.h
             )
     set(SCREEN_CAPTURE_PLATFORM_INC
             include/ios
@@ -105,6 +111,7 @@ include_directories(
 add_library(${PROJECT_NAME}
         include/ScreenCapture.h
         include/internal/SCCommon.h
+        include/internal/SCShared.h
         include/internal/ThreadManager.h
         src/ScreenCapture.cpp
         src/SCCommon.cpp

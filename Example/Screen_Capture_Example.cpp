@@ -258,30 +258,32 @@ void createwindowgrabber()
 int main()
 {
     auto windows = SL::Screen_Capture::GetWindows();
-    windows = SL::Screen_Capture::GetWindows();
-    windows = SL::Screen_Capture::GetWindows();
-    windows = SL::Screen_Capture::GetWindows();
-    windows = SL::Screen_Capture::GetWindows();
-    windows = SL::Screen_Capture::GetWindows();
-    windows = SL::Screen_Capture::GetWindows();
+//    windows = SL::Screen_Capture::GetWindows();
+//    windows = SL::Screen_Capture::GetWindows();
+//    windows = SL::Screen_Capture::GetWindows();
+//    windows = SL::Screen_Capture::GetWindows();
+//    windows = SL::Screen_Capture::GetWindows();
+//    windows = SL::Screen_Capture::GetWindows();
 
 
+//    auto accessibilityPermissions = SL::Screen_Capture::RequestAccessibilityPermissions();
     auto activeWindow = SL::Screen_Capture::GetActiveWindow();
-    activeWindow = SL::Screen_Capture::GetActiveWindow();
-    activeWindow = SL::Screen_Capture::GetActiveWindow();
-    activeWindow = SL::Screen_Capture::GetActiveWindow();
-    activeWindow = SL::Screen_Capture::GetActiveWindow();
-    activeWindow = SL::Screen_Capture::GetActiveWindow();
-    activeWindow = SL::Screen_Capture::GetActiveWindow();
-    activeWindow = SL::Screen_Capture::GetActiveWindow();
-
-#ifndef WINDOWS
-    while (true) {
-        activeWindow = SL::Screen_Capture::GetActiveWindow();
-        windows = SL::Screen_Capture::GetWindows();
-        usleep(100000);
-    }
-#endif
+//
+//    activeWindow = SL::Screen_Capture::GetActiveWindow();
+//    activeWindow = SL::Screen_Capture::GetActiveWindow();
+//    activeWindow = SL::Screen_Capture::GetActiveWindow();
+//    activeWindow = SL::Screen_Capture::GetActiveWindow();
+//    activeWindow = SL::Screen_Capture::GetActiveWindow();
+//    activeWindow = SL::Screen_Capture::GetActiveWindow();
+//    activeWindow = SL::Screen_Capture::GetActiveWindow();
+//
+//#ifndef WINDOWS
+//    while (true) {
+//        activeWindow = SL::Screen_Capture::GetActiveWindow();
+//        windows = SL::Screen_Capture::GetWindows();
+//        usleep(100000);
+//    }
+//#endif
 
 
 
