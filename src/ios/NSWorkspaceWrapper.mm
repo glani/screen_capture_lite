@@ -1,7 +1,7 @@
 #include "NSWorkspaceWrapperm.h"
 #import "SCAccessibilityElement.h"
-#include "Utils.h"
 #include "NSWorkspaceWrapperShared.h"
+#include "Utils.h"
 #import <AppKit/AppKit.h>
 #include <map>
 #include <vector>
@@ -29,14 +29,35 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
 
 - (NSArray *)determineApplicationValues
 {
-    auto pids = [[NSMutableArray alloc] init];
+    @autoreleasepool {
+        auto pids = [[NSMutableArray alloc] init];
+#if 0
     NSArray *appsArray = [[NSWorkspace sharedWorkspace] runningApplications];
     for (NSRunningApplication *a in appsArray) {
         auto pid = a.processIdentifier;
         [pids addObject:[NSNumber numberWithInteger:pid]];
     }
     [appsArray release];
-    return pids;
+#else
+        NSMutableSet *pidSet = [[NSMutableSet alloc] init];
+        auto windowList = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID);
+        CFIndex numWindows = CFArrayGetCount(windowList);
+        for (int i = 0; i < (int)numWindows; i++) {
+            auto dict = static_cast<CFDictionaryRef>(CFArrayGetValueAtIndex(windowList, i));
+            auto windowOwnerPID = static_cast<CFNumberRef>(CFDictionaryGetValue(dict, kCGWindowOwnerPID));
+            int windowPid;
+            if (windowOwnerPID != NULL && CFNumberGetValue(windowOwnerPID, kCFNumberIntType, &windowPid)) {
+                [pidSet addObject:[NSNumber numberWithInteger:windowPid]];
+            }
+        }
+        for (NSNumber *pId in pidSet) {
+            [pids addObject:pId];
+        }
+        CFRelease(pidSet);
+        CFRelease(windowList);
+#endif
+        return pids;
+    }
 }
 
 - (NSArray *)determineWindowsByProcessId:(pid_t)pid
@@ -63,6 +84,7 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
 }
 - (SCWindowData *)createWindowFromSCAccessibilityElement:(pid_t)pid:(SCAccessibilityElementWindows *)mainProcess:(SCAccessibilityElement *)element
 {
+
     auto window = [[SCWindowData alloc] init];
     window.pid = pid;
     NSString *processTitle = [mainProcess getProcessTitle];
@@ -199,6 +221,7 @@ namespace Screen_Capture {
                         CFRelease(absoluteString);
                     }
                 }
+                CFRelease(value);
                 NSArray *windows = [ptr determineWindowsByProcessId:pid];
                 this->processWindows(windows, pid, data.get(), execute);
                 CFRelease(windows);

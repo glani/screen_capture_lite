@@ -258,22 +258,22 @@ void createwindowgrabber()
 int main()
 {
     auto windows = SL::Screen_Capture::GetWindows();
-//    windows = SL::Screen_Capture::GetWindows();
-//    windows = SL::Screen_Capture::GetWindows();
-//    windows = SL::Screen_Capture::GetWindows();
-//    windows = SL::Screen_Capture::GetWindows();
-//    windows = SL::Screen_Capture::GetWindows();
-//    windows = SL::Screen_Capture::GetWindows();
+    windows = SL::Screen_Capture::GetWindows();
+    windows = SL::Screen_Capture::GetWindows();
+    windows = SL::Screen_Capture::GetWindows();
+    windows = SL::Screen_Capture::GetWindows();
+    windows = SL::Screen_Capture::GetWindows();
+    windows = SL::Screen_Capture::GetWindows();
 
 
 //    auto accessibilityPermissions = SL::Screen_Capture::RequestAccessibilityPermissions();
     auto activeWindow = SL::Screen_Capture::GetActiveWindow();
 //
-//    activeWindow = SL::Screen_Capture::GetActiveWindow();
-//    activeWindow = SL::Screen_Capture::GetActiveWindow();
-//    activeWindow = SL::Screen_Capture::GetActiveWindow();
-//    activeWindow = SL::Screen_Capture::GetActiveWindow();
-//    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    activeWindow = SL::Screen_Capture::GetActiveWindow();
 //    activeWindow = SL::Screen_Capture::GetActiveWindow();
 //    activeWindow = SL::Screen_Capture::GetActiveWindow();
 //

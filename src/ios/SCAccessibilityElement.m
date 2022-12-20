@@ -8,9 +8,6 @@
 }
 - (void)dealloc
 {
-    if (_title) {
-        CFRelease(_title);
-    }
     if (_focused) {
         CFRelease(_focused);
     }
@@ -59,7 +56,7 @@
 - (void)setWindowsList:(NSArray*)windowsList
 {
     if (_windowsList != NULL) {
-
+        [self deallocWindowsList];
     }
     _windowsList = (AXUIElementRef)CFRetain(windowsList);
 }
@@ -323,29 +320,31 @@
 
 - (SCAccessibilityElementWindows* )retrieveAllWindows
 {
-    CFTypeRef value;
-    AXError result;
-    result = AXUIElementCopyAttributeValue(_underlyingElement, kAXWindowsAttribute, &value);
-    if (result == kAXErrorSuccess) {
-        NSArray *windowsLst = (NSArray *)value;
+    @autoreleasepool {
+        CFTypeRef value;
+        AXError result;
+        result = AXUIElementCopyAttributeValue(_underlyingElement, kAXWindowsAttribute, &value);
+        if (result == kAXErrorSuccess) {
+            NSArray *windowsLst = (NSArray *)value;
 
-        NSMutableArray *res = [[NSMutableArray alloc] init];
-        for (id elem in windowsLst) {
-            SCAccessibilityElement *accessibilityElement = [SCAccessibilityElement new];
-            accessibilityElement.underlyingElement = elem;
-            [res addObject:accessibilityElement];
+            NSMutableArray *res = [[NSMutableArray alloc] init];
+            for (id elem in windowsLst) {
+                SCAccessibilityElement *accessibilityElement = [SCAccessibilityElement new];
+                accessibilityElement.underlyingElement = elem;
+                [res addObject:accessibilityElement];
+            }
+            [windowsLst release];
+
+            SCAccessibilityElementWindows *accessibilityElementWindows = [SCAccessibilityElementWindows new];
+            accessibilityElementWindows.windowsList = res;
+            NSString *title = [self stringValueOfAttribute:kAXTitleAttribute];
+            accessibilityElementWindows.processTitle = title;
+            [res release];
+            return accessibilityElementWindows;
         }
-        [windowsLst release];
-
-        SCAccessibilityElementWindows *accessibilityElementWindows = [SCAccessibilityElementWindows new];
-        accessibilityElementWindows.windowsList = res;
-        NSString *title = [self stringValueOfAttribute:kAXTitleAttribute];
-        accessibilityElementWindows.processTitle = title;
-        [res release];
-        [title release];
-        return accessibilityElementWindows;
-    } else {
-        return NULL;
+        else {
+            return NULL;
+        }
     }
 }
 
