@@ -1,0 +1,47 @@
+Subject: [PATCH] test-method
+---
+Index: src/ios/SCAccessibilityElement.m
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/ios/SCAccessibilityElement.m b/src/ios/SCAccessibilityElement.m
+--- a/src/ios/SCAccessibilityElement.m	(revision c1b9e8c7503c7a7737a9672fb5b349a3c10e5aed)
++++ b/src/ios/SCAccessibilityElement.m	(date 1671747935101)
+@@ -340,4 +340,35 @@
+     }
+ }
+ 
++- (void)test
++{
++    CFTypeRef value;
++    //    CFArrayRef names;
++    NSArray *attrNames;
++    AXError result;
++    CGRect rect = [self rectOfElement];
++    BOOL trusted = AXIsProcessTrusted();
++    result = AXUIElementCopyAttributeNames(_underlyingElement, (CFArrayRef)&attrNames);
++    NSString *v21 = [self stringValueOfAttribute:kAXTitleAttribute];
++    NSString *vAXSubroleAttribute = [self stringValueOfAttribute:kAXSubroleAttribute];
++    NSString *vAXRoleAttribute = [self stringValueOfAttribute:kAXRoleAttribute];
++    NSLog(@"kAXTitleAttribute %@", v21);
++
++    for (id name in attrNames) {
++        NSLog(@"%@", name);
++        if (AXUIElementCopyAttributeValue(_underlyingElement, name, (CFTypeRef *)&result) == kAXErrorSuccess) {
++            NSString *value = [self stringValueOfAttribute:name];
++            NSLog(@"success %@ => %@", name, value);
++        }
++    }
++
++    SCAccessibilityElementWindows*  res = [self retrieveAllWindows];
++
++    for (id elem in [res getWindowsList]) {
++        NSLog(@"===========================");
++        [elem test];
++        break;
++    }
++}
++
+ @end
+\ No newline at end of file

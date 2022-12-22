@@ -249,10 +249,8 @@ namespace Screen_Capture {
             std::shared_ptr<std::string> execute;
             auto executableURL = [application executableURL];
             if (executableURL) {
-                CFStringRef absoluteString =
-                    CFStringCreateWithCString((CFAllocatorRef)NULL, [executableURL absoluteString].UTF8String, kCFStringEncodingUTF8);
-                execute = getString(absoluteString);
-                CFRelease(absoluteString);
+                CFStringRef valueCSStr = (__bridge CFStringRef)[executableURL absoluteString];
+                execute = getString(valueCSStr);
             }
             return execute;
         }
@@ -267,9 +265,9 @@ namespace Screen_Capture {
                 [newRep setSize:[image size]];
                 NSData *pngData = [newRep representationUsingType:NSPNGFileType properties:nil];
                 auto encodedString = [pngData base64Encoding];
-                CFStringRef value = (__bridge CFStringRef)[NSString stringWithFormat:@"data:image/png;base64,%@", encodedString];
-                icon = getString(value);
-                CFRelease(value);
+                NSString *value = [NSString stringWithFormat:@"data:image/png;base64,%@", encodedString];
+                CFStringRef valueCSStr = (__bridge CFStringRef)value;
+                icon = getString(valueCSStr);
                 [newRep autorelease];
             }
             return icon;
