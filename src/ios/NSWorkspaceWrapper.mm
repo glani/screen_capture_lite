@@ -264,7 +264,7 @@ namespace Screen_Capture {
             if (image) {
                 CGImageRef cgRef = [image CGImageForProposedRect:NULL context:nil hints:nil];
                 NSBitmapImageRep *newRep = [[NSBitmapImageRep alloc] initWithCGImage:cgRef];
-                [newRep setSize:[image size]]; // if you want the same resolution
+                [newRep setSize:[image size]];
                 NSData *pngData = [newRep representationUsingType:NSPNGFileType properties:nil];
                 auto encodedString = [pngData base64Encoding];
                 CFStringRef value = (__bridge CFStringRef)[NSString stringWithFormat:@"data:image/png;base64,%@", encodedString];
