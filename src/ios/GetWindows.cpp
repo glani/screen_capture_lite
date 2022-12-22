@@ -87,10 +87,17 @@ namespace Screen_Capture {
             windowPtr->Attributes.emplace_back(attributeVisible);
         }
         if (window->execute != NULL) {
-            WindowAttribute attributeName;
-            attributeName.Code = std::string(S_RES_START_ABSOLUTE_URL);
-            attributeName.Value = *window->execute;
-            windowPtr->Attributes.emplace_back(attributeName);
+            WindowAttribute attribute;
+            attribute.Code = std::string(S_RES_START_ABSOLUTE_URL);
+            attribute.Value = *window->execute;
+            windowPtr->Attributes.emplace_back(attribute);
+        }
+
+        if (window->icon != NULL) {
+            WindowAttribute attribute;
+            attribute.Code = std::string(S_RES_ICON_URL);
+            attribute.Value = *window->icon;
+            windowPtr->Attributes.emplace_back(attribute);
         }
         return windowPtr;
     }

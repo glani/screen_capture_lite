@@ -18,6 +18,7 @@ namespace Screen_Capture {
         std::shared_ptr<bool> main;
         std::shared_ptr<bool> minimized;
         std::shared_ptr<std::string> execute;
+        std::shared_ptr<std::string> icon;
     };
     struct ScreenData {
         CGRect frame;

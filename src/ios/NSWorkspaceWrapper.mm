@@ -8,6 +8,7 @@
 
 extern const CFStringRef kWindowPid = CFSTR("kWindowPid");
 extern const CFStringRef kWindowAbsoluteUrlString = CFSTR("kWindowAbsoluteUrlString");
+extern const CFStringRef kWindowIconString = CFSTR("kWindowIconString");
 extern const CFStringRef kWindowLocalizedName = CFSTR("kWindowLocalizedName");
 extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
 
@@ -213,18 +214,14 @@ namespace Screen_Capture {
                 auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
                 std::shared_ptr<std::string> execute;
                 if (application) {
-                    auto executableURL = [application executableURL];
-                    if (executableURL) {
-                        CFStringRef absoluteString =
-                            CFStringCreateWithCString((CFAllocatorRef)NULL, [executableURL absoluteString].UTF8String, kCFStringEncodingUTF8);
-                        execute = getString(absoluteString);
-                        CFRelease(absoluteString);
-                    }
+                    std::shared_ptr<std::string> execute;
+                    std::shared_ptr<std::string> icon;
+                    icon = retrieveIcon(application);
+                    execute = retrieveExecutableURL(application);
+                    NSArray *windows = [ptr determineWindowsByProcessId:pid];
+                    this->processWindows(windows, pid, data.get(), execute, icon);
+                    CFRelease(windows);
                 }
-                CFRelease(value);
-                NSArray *windows = [ptr determineWindowsByProcessId:pid];
-                this->processWindows(windows, pid, data.get(), execute);
-                CFRelease(windows);
             }
 
             [ptr releaseApplicationValues:values];
@@ -235,23 +232,50 @@ namespace Screen_Capture {
         {
             std::shared_ptr<std::vector<struct WindowData>> data = std::make_shared<std::vector<struct WindowData>>();
             NSArray *windows = [ptr determineWindowsByProcessId:pid];
-            std::shared_ptr<std::string> execute;
             auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
             if (application) {
-                auto executableURL = [application executableURL];
-                if (executableURL) {
-                    CFStringRef absoluteString =
-                        CFStringCreateWithCString((CFAllocatorRef)NULL, [executableURL absoluteString].UTF8String, kCFStringEncodingUTF8);
-                    execute = getString(absoluteString);
-                    CFRelease(absoluteString);
-                }
+                std::shared_ptr<std::string> execute;
+                std::shared_ptr<std::string> icon;
+                icon = retrieveIcon(application);
+                execute = retrieveExecutableURL(application);
+                this->processWindows(windows, pid, data.get(), execute, icon);
             }
-            this->processWindows(windows, pid, data.get(), execute);
             CFRelease(windows);
             return data;
         }
 
-        void processWindows(NSArray *windows, int pid, std::vector<struct WindowData> *data, std::shared_ptr<std::string> &execute)
+        std::shared_ptr<std::string> retrieveExecutableURL(NSRunningApplication *application)
+        {
+            std::shared_ptr<std::string> execute;
+            auto executableURL = [application executableURL];
+            if (executableURL) {
+                CFStringRef absoluteString =
+                    CFStringCreateWithCString((CFAllocatorRef)NULL, [executableURL absoluteString].UTF8String, kCFStringEncodingUTF8);
+                execute = getString(absoluteString);
+                CFRelease(absoluteString);
+            }
+            return execute;
+        }
+
+        std::shared_ptr<std::string> retrieveIcon(NSRunningApplication *application)
+        {
+            std::shared_ptr<std::string> icon;
+            auto image = [application icon];
+            if (image) {
+                CGImageRef cgRef = [image CGImageForProposedRect:NULL context:nil hints:nil];
+                NSBitmapImageRep *newRep = [[NSBitmapImageRep alloc] initWithCGImage:cgRef];
+                [newRep setSize:[image size]]; // if you want the same resolution
+                NSData *pngData = [newRep representationUsingType:NSPNGFileType properties:nil];
+                auto encodedString = [pngData base64Encoding];
+                CFStringRef value = (__bridge CFStringRef)[NSString stringWithFormat:@"data:image/png;base64,%@", encodedString];
+                icon = getString(value);
+                CFRelease(value);
+                [newRep autorelease];
+            }
+            return icon;
+        }
+
+        void processWindows(NSArray *windows, int pid, std::vector<struct WindowData> *data, std::shared_ptr<std::string> &execute, std::shared_ptr<std::string> &icon)
         {
             int i = 0;
             for (SCWindowData *window in windows) {
@@ -289,6 +313,8 @@ namespace Screen_Capture {
                 if (execute) {
                     wd.execute = execute;
                 }
+
+                wd.icon = icon;
 
                 CFRelease(window);
                 data->push_back(wd);
