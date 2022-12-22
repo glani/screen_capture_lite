@@ -69,8 +69,12 @@ elseif (APPLE)
             src/ios/NSWorkspaceWrapper.mm
             src/ios/NSWorkspaceWrapper.cpp
             include/ios/NSWorkspaceWrapper.h
+            src/ios/NSScreenWrapper.cpp
+            include/ios/NSScreenWrapper.h
             include/ios/NSWorkspaceWrapperShared.h
             include/ios/NSWorkspaceWrapperm.h
+            src/ios/NSScreenWrapper.mm
+            include/ios/NSScreenWrapperm.h
             src/ios/Utils.cpp
             include/ios/Utils.h
             )

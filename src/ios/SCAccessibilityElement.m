@@ -1,5 +1,4 @@
 #import "SCAccessibilityElement.h"
-#include "NSWorkspaceWrapper.inc.h"
 
 #import <AppKit/AppKit.h>
 
@@ -291,13 +290,6 @@
         window.title = nil;
     }
     window.rect = rect;
-//    CFBooleanRef focused = [self booleanValueOfAttribute:kAXFocusedWindowAttribute];
-//    if (focused != nil) {
-//        window.focused = CFRetain(focused);
-//        CFRelease(focused);
-//    }
-//    else {
-//    }
 
     window.focused = nil;
     CFBooleanRef main = [self booleanValueOfAttribute:kAXMainAttribute];
