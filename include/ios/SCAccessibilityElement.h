@@ -2,6 +2,14 @@
 
 #import <Carbon/Carbon.h>
 
+@interface NSWindowDataRequest : NSObject
+@property(nonatomic) int pid;
+@property(nonatomic) int num;
+@property(nonatomic) bool minimized;
+@property(nonatomic) bool fullscreen;
+@property(nonatomic) CGRect rect;
+
+@end
 @interface SCWindowData : NSObject
 @property(nonatomic) CFStringRef processTitle;
 @property(nonatomic) int pid;
@@ -10,6 +18,7 @@
 @property(nonatomic) CFBooleanRef focused;
 @property(nonatomic) CFBooleanRef main;
 @property(nonatomic) CFBooleanRef minimized;
+@property(nonatomic) CFBooleanRef fullscreen;
 @end
 
 @interface SCAccessibilityElementWindows : NSObject
@@ -43,5 +52,9 @@
 
 - (BOOL)permissionsRequest;
 
+- (BOOL)determineRequiredWindow:(NSWindowDataRequest *)request:(bool)force;
 - (void)enrich:(SCWindowData *)window;
+- (void)fullscreenWindow:(bool)fullscreen;
+- (void)minimizeWindow:(bool)minimize;
+- (void)topMostWindow;
 @end

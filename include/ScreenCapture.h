@@ -20,34 +20,52 @@
 
 namespace SL {
 namespace Screen_Capture {
-    struct SC_LITE_EXTERN Point {
-        int x;
-        int y;
+    struct SC_LITE_EXTERN Size {
+        int Height = 0;
+        int Width = 0;
     };
+
+    struct SC_LITE_EXTERN Point {
+        int X = 0;
+        int Y = 0;
+    };
+
     struct SC_LITE_EXTERN MousePoint {
         Point Position;
         Point HotSpot;
     };
+
     struct SC_LITE_EXTERN WindowAttribute {
         std::string Code;
         std::string Value;
     };
+
     struct SC_LITE_EXTERN Window {
         size_t Handle;
         size_t OwnerHandle;
         Point Position;
-
-        Point Size;
+        Size Size;
         std::string Name;
-
+        std::string ProcessName;
         std::vector<WindowAttribute> Attributes;
     };
+
+    struct SC_LITE_EXTERN WindowRequest {
+        size_t Handle;
+        size_t OwnerHandle;
+        Point Position;
+        Size Size;
+        bool Minimized;
+        bool Fullscreen;
+    };
+
     struct SC_LITE_EXTERN Rect {
         int X = 0;
         int Y = 0;
         int Height = 0;
         int Width = 0;
     };
+
     struct SC_LITE_EXTERN Monitor {
         int Id = INT32_MAX;
         int Index = INT32_MAX;
@@ -133,6 +151,21 @@ namespace Screen_Capture {
         }
     }
 
+    inline WindowRequest WindowToWindowRequest(const Window &window)
+    {
+        WindowRequest windowRequest;
+
+        windowRequest.Handle = window.Handle;
+        windowRequest.OwnerHandle = window.OwnerHandle;
+        windowRequest.Position = window.Position;
+        windowRequest.Size = window.Size;
+//        windowRequest.Minimized = window.Minimized;
+//        windowRequest.Fullscreen = window.Fullscreen;
+
+        return windowRequest;
+    }
+
+
     class Timer {
         using Clock =
             std::conditional<std::chrono::high_resolution_clock::is_steady, std::chrono::high_resolution_clock, std::chrono::steady_clock>::type;
@@ -161,11 +194,18 @@ namespace Screen_Capture {
     // will return all windows
     SC_LITE_EXTERN std::shared_ptr<std::vector<Window>> GetWindows();
 
+    // Make window full screen
+    SC_LITE_EXTERN std::shared_ptr<Window> Fullscreen(const WindowRequest& windowRequests, int display, bool fullscreen);
+    // Make window minimize
+    SC_LITE_EXTERN std::shared_ptr<Window> Minimize(const WindowRequest& windowRequests, bool minimize);
+    // Set rectangle
+    SC_LITE_EXTERN std::shared_ptr<Window> Rectangle(const WindowRequest& windowRequests, const Point& position, const Size& size);
+    // Make window top most
+    SC_LITE_EXTERN std::shared_ptr<Window> Topmost(const WindowRequest& windowRequests);
     // will return active window
-    std::shared_ptr<Window> GetActiveWindow();
-
+    SC_LITE_EXTERN std::shared_ptr<Window> GetActiveWindow();
     // request accessibility permissions
-    bool RequestAccessibilityPermissions();
+    SC_LITE_EXTERN bool RequestAccessibilityPermissions();
 
     typedef std::function<void(const SL::Screen_Capture::Image &img, const Window &window)> WindowCaptureCallback;
     typedef std::function<void(const SL::Screen_Capture::Image &img, const Monitor &monitor)> ScreenCaptureCallback;

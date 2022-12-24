@@ -21,6 +21,10 @@ namespace Screen_Capture {
     std::shared_ptr<std::vector<struct WindowData>> determineWindowsWrap(NSWorkspaceWrapperImpl *p, int pid);
     std::shared_ptr<std::vector<struct WindowData>> determineWindowsWrap(NSWorkspaceWrapperImpl *p);
 
+    std::shared_ptr<struct WindowData> minimizeWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest& windowRequest, bool minimize);
+    std::shared_ptr<struct WindowData> fullscreenWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest& windowRequest, int display, bool fullscreen);
+    std::shared_ptr<struct WindowData> rectWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest& windowRequest, const CGRect& rect);
+    std::shared_ptr<struct WindowData> topMostWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest& windowRequest);
 
     class NSWorkspaceWrapper {
         NSWorkspaceWrapperImpl *NSWorkspaceWrapperImpl_ = nullptr;
@@ -39,6 +43,11 @@ namespace Screen_Capture {
         std::shared_ptr<std::map<int, struct ApplicationData>> determineApplicationValues();
         std::shared_ptr<std::vector<struct WindowData>> determineWindows(int pid);
         std::shared_ptr<std::vector<struct WindowData>> determineWindows();
+
+        std::shared_ptr<struct WindowData> minimize(const WindowDataRequest& windowRequest, bool minimize);
+        std::shared_ptr<struct WindowData> fullscreen(const WindowDataRequest& windowRequest, int display, bool fullscreen);
+        std::shared_ptr<struct WindowData> rectWindow(const WindowDataRequest& windowRequest, const CGRect& rect);
+        std::shared_ptr<struct WindowData> topMost(const WindowDataRequest& windowRequest);
     };
 } // namespace Screen_Capture
 } // namespace SL

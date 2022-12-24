@@ -2,9 +2,10 @@
 
 #import <AppKit/AppKit.h>
 
-@implementation SCWindowData {
+@implementation NSWindowDataRequest
+@end
 
-}
+@implementation SCWindowData
 - (void)dealloc
 {
     if (_focused) {
@@ -22,7 +23,7 @@
 
 @end;
 @implementation SCAccessibilityElementWindows {
-    NSArray * _windowsList;
+    NSArray *_windowsList;
     NSString *_processTitle;
 }
 
@@ -44,15 +45,17 @@
     }
 }
 
-- (NSArray*)getWindowsList {
+- (NSArray *)getWindowsList
+{
     return _windowsList;
 }
 
-- (NSString*)getProcessTitle {
+- (NSString *)getProcessTitle
+{
     return _processTitle;
 }
 
-- (void)setWindowsList:(NSArray*)windowsList
+- (void)setWindowsList:(NSArray *)windowsList
 {
     if (_windowsList != NULL) {
         [self deallocWindowsList];
@@ -60,14 +63,15 @@
     _windowsList = (AXUIElementRef)CFRetain(windowsList);
 }
 
-- (void)setProcessTitle:(NSString*)processTitle
+- (void)setProcessTitle:(NSString *)processTitle
 {
     if (_processTitle != NULL) {
         CFRelease(_processTitle);
     }
-    _processTitle = (NSString*)CFRetain(processTitle);
+    if (processTitle) {
+        _processTitle = (NSString *)CFRetain(processTitle);
+    }
 }
-
 
 @end
 @implementation SCAccessibilityElement {
@@ -279,14 +283,15 @@
     }
     return trusted;
 }
-- (void)enrich:(SCWindowData*)window
+- (void)enrich:(SCWindowData *)window
 {
     CGRect rect = [self rectOfElement];
     NSString *title = [self stringValueOfAttribute:kAXTitleAttribute];
     if (title) {
         window.title = (CFStringRef)CFRetain((__bridge CFStringRef)title);
         CFRelease(title);
-    } else {
+    }
+    else {
         window.title = nil;
     }
     window.rect = rect;
@@ -308,9 +313,18 @@
     else {
         window.minimized = nil;
     };
+
+    CFBooleanRef fullscreen = [self booleanValueOfAttribute:@"AXFullScreen"];
+    if (fullscreen != nil) {
+        window.fullscreen = CFRetain(fullscreen);
+        CFRelease(fullscreen);
+    }
+    else {
+        window.fullscreen = nil;
+    };
 }
 
-- (SCAccessibilityElementWindows* )retrieveAllWindows
+- (SCAccessibilityElementWindows *)retrieveAllWindows
 {
     @autoreleasepool {
         CFTypeRef value;
@@ -339,5 +353,35 @@
         }
     }
 }
+- (BOOL)determineRequiredWindow:(NSWindowDataRequest *)request:(bool)force
+{
+    if (force) {
+        return YES;
+    } else {
+        CGRect windowRect = [self rectOfElement];
+        if (CGRectEqualToRect(windowRect, request.rect)) {
+            // do some stuff
+            return YES;
+        } else {
+            return NO;
+        }
+    }
+}
 
+- (void)fullscreenWindow:(int)display:(bool)fullscreen
+{
+    AXValueRef fullscreenRef = fullscreen ? kCFBooleanTrue : kCFBooleanFalse;
+    [self setValue:fullscreenRef forAttribute:@"AXFullScreen"];
+}
+
+- (void)minimizeWindow:(bool)minimize
+{
+    AXValueRef minimizeRef = minimize ? kCFBooleanTrue : kCFBooleanFalse;
+    [self setValue:minimizeRef forAttribute:kAXMinimizedAttribute];
+}
+
+- (void)topMostWindow
+{
+    [self setValue:kCFBooleanTrue forAttribute:(__bridge CFStringRef)NSAccessibilityMainAttribute];
+}
 @end

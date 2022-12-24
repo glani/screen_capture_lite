@@ -99,10 +99,10 @@ void createframegrabber()
             ->onMouseChanged([&](const SL::Screen_Capture::Image *img, const SL::Screen_Capture::MousePoint &mousepoint) {
                 auto r = realcounter.fetch_add(1);
                 auto s = std::to_string(r) + std::string(" M") + std::string(".png");
-                if (img) {/*
-                    std::cout << "New mouse coordinates  AND NEW Image received."
-                              << " x= " << mousepoint.Position.x << " y= " << mousepoint.Position.y << std::endl;
-                    lodepng::encode(s, (unsigned char*)StartSrc(*img), Width(*img), Height(*img));*/
+                if (img) { /*
+                     std::cout << "New mouse coordinates  AND NEW Image received."
+                               << " x= " << mousepoint.Position.x << " y= " << mousepoint.Position.y << std::endl;
+                     lodepng::encode(s, (unsigned char*)StartSrc(*img), Width(*img), Height(*img));*/
                 }
                 else {
                     // std::cout << "New mouse coordinates received." << " x= " << point.x << " y= " << point.y << " The
@@ -168,10 +168,10 @@ void createpartialframegrabber()
             ->onMouseChanged([&](const SL::Screen_Capture::Image *img, const SL::Screen_Capture::MousePoint &mousepoint) {
                 auto r = realcounter.fetch_add(1);
                 auto s = std::to_string(r) + std::string(" M") + std::string(".png");
-                if (img) {/*
-                    std::cout << "New mouse coordinates  AND NEW Image received."
-                              << " x= " << mousepoint.Position.x << " y= " << mousepoint.Position.y << std::endl;
-                    lodepng::encode(s, (unsigned char *)StartSrc(*img), Width(*img), Height(*img));*/
+                if (img) { /*
+                     std::cout << "New mouse coordinates  AND NEW Image received."
+                               << " x= " << mousepoint.Position.x << " y= " << mousepoint.Position.y << std::endl;
+                     lodepng::encode(s, (unsigned char *)StartSrc(*img), Width(*img), Height(*img));*/
                 }
                 else {
                     // std::cout << "New mouse coordinates received." << " x= " << point.x << " y= " << point.y << " The
@@ -202,10 +202,10 @@ void createwindowgrabber()
                 std::transform(name.begin(), name.end(), name.begin(), [](char c) { return std::tolower(c, std::locale()); });
                 if (name.find(srchterm) != std::string::npos) {
                     filtereditems->push_back(a);
-                    std::cout << "ADDING WINDOW  Height " << a.Size.y << "  Width  " << a.Size.x << "   " << a.Name << std::endl;
+                    std::cout << "ADDING WINDOW  Height " << a.Size.Height << "  Width  " << a.Size.Width << "   " << a.Name << std::endl;
                 }
             }
-            return *filtereditems;
+            return filtereditems ? *filtereditems : std::vector<SL::Screen_Capture::Window>();
         })
 
             ->onFrameChanged([&](const SL::Screen_Capture::Image &img, const SL::Screen_Capture::Window &window) {
@@ -257,36 +257,48 @@ void createwindowgrabber()
 }
 int main()
 {
-//    auto windows = SL::Screen_Capture::GetWindows();
-//    windows = SL::Screen_Capture::GetWindows();
-//    windows = SL::Screen_Capture::GetWindows();
-//    windows = SL::Screen_Capture::GetWindows();
-//    windows = SL::Screen_Capture::GetWindows();
-//    windows = SL::Screen_Capture::GetWindows();
-//    windows = SL::Screen_Capture::GetWindows();
+    std::shared_ptr<std::vector<SL::Screen_Capture::Window>> windows = SL::Screen_Capture::GetWindows();
+    if (windows) {
+        std::string reqApp("Geany");
+        auto fit = std::find_if(windows->begin(), windows->end(), [&](const SL::Screen_Capture::Window &elem) { return elem.ProcessName == reqApp; });
+        if (fit != windows->end()) {
 
+            SL::Screen_Capture::WindowRequest req = SL::Screen_Capture::WindowToWindowRequest(*fit);
+            //            SL::Screen_Capture::Fullscreen(req, -1, true);
+            //            SL::Screen_Capture::Fullscreen(req, -1, false);
+            SL::Screen_Capture::Topmost(req);
+            SL::Screen_Capture::Rectangle(req, {req.Position.X + 100, req.Position.Y + 100}, req.Size);
+            //            SL::Screen_Capture::Minimize(req, false);
+            //            SL::Screen_Capture::Minimize(req, true);
+        }
+    }
+    //    windows = SL::Screen_Capture::GetWindows();
+    //    windows = SL::Screen_Capture::GetWindows();
+    //    windows = SL::Screen_Capture::GetWindows();
+    //    windows = SL::Screen_Capture::GetWindows();
+    //    windows = SL::Screen_Capture::GetWindows();
+    //    windows = SL::Screen_Capture::GetWindows();
 
-//    auto accessibilityPermissions = SL::Screen_Capture::RequestAccessibilityPermissions();
+    //    auto accessibilityPermissions = SL::Screen_Capture::RequestAccessibilityPermissions();
     auto activeWindow = SL::Screen_Capture::GetActiveWindow();
-////
-//    activeWindow = SL::Screen_Capture::GetActiveWindow();
-//    activeWindow = SL::Screen_Capture::GetActiveWindow();
-//    activeWindow = SL::Screen_Capture::GetActiveWindow();
-//    activeWindow = SL::Screen_Capture::GetActiveWindow();
-//    activeWindow = SL::Screen_Capture::GetActiveWindow();
-//    activeWindow = SL::Screen_Capture::GetActiveWindow();
-//    activeWindow = SL::Screen_Capture::GetActiveWindow();
-//
-//#ifndef WINDOWS
-//    while (true) {
-//        activeWindow = SL::Screen_Capture::GetActiveWindow();
-//        windows = SL::Screen_Capture::GetWindows();
-//        usleep(100000);
-//    }
-//#endif
+    ////
+    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    //
+    // #ifndef WINDOWS
+    //    while (true) {
+    //        activeWindow = SL::Screen_Capture::GetActiveWindow();
+    //        windows = SL::Screen_Capture::GetWindows();
+    //        usleep(100000);
+    //    }
+    // #endif
 
-
-
+    std::srand(std::time(nullptr));
     std::srand(std::time(nullptr));
     std::cout << "Starting Capture Demo/Test" << std::endl;
     std::cout << "Testing captured monitor bounds check" << std::endl;

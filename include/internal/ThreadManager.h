@@ -184,7 +184,7 @@ namespace Screen_Capture {
     template <class T, class F> bool TryCaptureWindow(const F &data, Window &wnd)
     {
         T frameprocessor;
-        frameprocessor.ImageBufferSize = wnd.Size.x * wnd.Size.y * sizeof(ImageBGRA);
+        frameprocessor.ImageBufferSize = wnd.Size.Width * wnd.Size.Height * sizeof(ImageBGRA);
         if (data->WindowCaptureData.OnFrameChanged) { // only need the old buffer if difs are needed. If no dif is needed, then the
                                                       // image is always new
             frameprocessor.ImageBuffer = std::make_unique<unsigned char[]>(frameprocessor.ImageBufferSize);

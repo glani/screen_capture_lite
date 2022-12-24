@@ -1,5 +1,6 @@
 #pragma once
 
+#import "SCAccessibilityElement.h"
 #import <Foundation/Foundation.h>
 
 @interface NSWorkspaceWrapper : NSObject
@@ -10,4 +11,9 @@
 - (NSArray *)determineApplicationValues;
 - (NSArray *)determineWindowsByProcessId:(pid_t)pid;
 - (void)releaseApplicationValues:(NSArray *)values;
+- (SCWindowData *)minimizeWindow:(NSWindowDataRequest *)request:(bool)minimize;
+- (SCWindowData *)fullscreenWindow:(NSWindowDataRequest *)request:(int)display:(bool)fullscreen;
+- (SCWindowData *)setRectWindow:(NSWindowDataRequest *)request:(CGRect)rect;
+
+- (SCWindowData *)topMostWindow:(NSWindowDataRequest *)request;
 @end
