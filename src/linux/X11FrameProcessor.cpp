@@ -1,7 +1,6 @@
 #include "X11FrameProcessor.h"
 #include <X11/Xutil.h> 
-#include <assert.h>
-#include <vector>
+
 
 namespace SL
 {
@@ -46,8 +45,8 @@ namespace Screen_Capture
                                 ZPixmap,
                                 NULL,
                                 ShmInfo.get(),
-                                selectedwindow.Size.x,
-                                selectedwindow.Size.y);
+                                selectedwindow.Size.Width,
+                                selectedwindow.Size.Height);
         ShmInfo->shmid = shmget(IPC_PRIVATE, XImage_->bytes_per_line * XImage_->height, IPC_CREAT | 0777);
 
         ShmInfo->readOnly = False;

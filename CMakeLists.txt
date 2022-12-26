@@ -72,6 +72,8 @@ elseif (APPLE)
             include/ios
             )
 else ()
+    FIND_PACKAGE(PkgConfig REQUIRED)
+
     set(SCREEN_CAPTURE_PLATFORM_SRC
             include/linux/X11MouseProcessor.h
             src/linux/X11MouseProcessor.cpp
@@ -80,10 +82,15 @@ else ()
             src/linux/X11FrameProcessorSync.cpp
             src/linux/X11FrameProcessor.cpp
             src/linux/GetMonitors.cpp
-            src/linux/GetWindows.cpp
+            src/linux/png/lodepng.cpp
+            src/linux/png/lodepng.h
+            src/linux/base64/base64.cpp
+            src/linux/base64/base64.h
+
+
             src/linux/ThreadRunner.cpp
             src/linux/SyncRunner.cpp
-            )
+            src/linux/base64/base64.cpp src/linux/base64/base64.h)
     find_package(X11 REQUIRED)
     if (!X11_XTest_FOUND)
         message(FATAL_ERROR "X11 extensions are required, but not found!")
@@ -91,10 +98,33 @@ else ()
     if (!X11_Xfixes_LIB)
         message(FATAL_ERROR "X11 fixes extension is required, but not found!")
     endif ()
+    # TODO switch to require #    pkg_check_modules(WNCK REQUIRED libwnck-3.0)
+    # does not work
+    # pkg_check_modules(WNCK libwnck-3.0)
+    message(STATUS "dfdasasdasd" ${WNCK_FOUND})
+    if (NOT DEFINED WNCK_FOUND OR TRUE)
+        list(APPEND SCREEN_CAPTURE_PLATFORM_SRC
+            src/linux/GetWindows.cpp
+        )
+        message(STATUS "WNCK extensions are missed use native!")
+    else()
+        message(STATUS "WNCK extensions are found!")
+        list(APPEND SCREEN_CAPTURE_PLATFORM_SRC
+                src/linux/GetWindowsLibWnck.cpp.1
+        )
+        add_definitions(-D_USE_LIBWNCK -DWNCK_I_KNOW_THIS_IS_UNSTABLE)
+    endif ()
+
+    if (!WNCK_Xfixes_LIB)
+        message(STATUS "WNCK fixes extension is required, but not found!")
+    endif ()
+
     set(SCREEN_CAPTURE_PLATFORM_INC
             include/linux
             ${X11_INCLUDE_DIR}
+            ${WNCK_INCLUDE_DIRS}
             )
+
 endif ()
 
 

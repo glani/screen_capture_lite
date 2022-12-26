@@ -131,12 +131,11 @@ namespace SL {
                     attributeClass.Value = *ownerNameValue;
                     windowPtr->Attributes.emplace_back(attributeClass);
 
-                    WindowAttribute attributeName;
-                    attributeName.Code = std::string("res_name");
-                    attributeName.Value = *ownerNameValue;
-                    windowPtr->Attributes.emplace_back(attributeName);
-                }
-            }
+            WindowAttribute attributeName;
+            attributeName.Code = std::string(S_RES_NAME);
+            attributeName.Value = *ownerName;
+            windowPtr->Attributes.emplace_back(attributeName);
+        }
 
             WindowAttribute attributeVisible;
             attributeVisible.Code = std::string("res_visible");

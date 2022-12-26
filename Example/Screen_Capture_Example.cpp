@@ -192,7 +192,9 @@ void createwindowgrabber()
     framgrabber = nullptr;
     framgrabber =
         SL::Screen_Capture::CreateCaptureConfiguration([]() {
-            auto windows = SL::Screen_Capture::GetWindows();
+            SL::Screen_Capture::WindowsRequest request;
+            request.RetrieveIcons = false;
+            auto windows = SL::Screen_Capture::GetWindows(request);
             std::string srchterm = "cmake";
             // convert to lower case for easier comparisons
             std::transform(srchterm.begin(), srchterm.end(), srchterm.begin(), [](char c) { return std::tolower(c, std::locale()); });
@@ -255,7 +257,7 @@ void createwindowgrabber()
     framgrabber->setFrameChangeInterval(std::chrono::milliseconds(100));
     framgrabber->setMouseChangeInterval(std::chrono::milliseconds(100));
 }
-int main()
+int main(int arch, char** argv)
 {
     auto windows = SL::Screen_Capture::GetWindows();
     windows = SL::Screen_Capture::GetWindows();
@@ -264,24 +266,33 @@ int main()
     windows = SL::Screen_Capture::GetWindows();
     windows = SL::Screen_Capture::GetWindows();
     windows = SL::Screen_Capture::GetWindows();
+    SL::Screen_Capture::WindowsRequest request;
+    request.RetrieveIcons = true;
+    std::shared_ptr<std::vector<SL::Screen_Capture::Window>> windows = SL::Screen_Capture::GetWindows(request);
+    if (windows) {
+        std::string reqApp("Geany");
+        auto fit = std::find_if(windows->begin(), windows->end(), [&](const SL::Screen_Capture::Window &elem) { return elem.ProcessName == reqApp; });
+        if (fit != windows->end()) {
 
 
-    auto activeWindow = SL::Screen_Capture::GetActiveWindow();
-    activeWindow = SL::Screen_Capture::GetActiveWindow();
-    activeWindow = SL::Screen_Capture::GetActiveWindow();
-    activeWindow = SL::Screen_Capture::GetActiveWindow();
-    activeWindow = SL::Screen_Capture::GetActiveWindow();
-    activeWindow = SL::Screen_Capture::GetActiveWindow();
-    activeWindow = SL::Screen_Capture::GetActiveWindow();
-    activeWindow = SL::Screen_Capture::GetActiveWindow();
-
-#ifndef WINDOWS
-    while (true) {
-        activeWindow = SL::Screen_Capture::GetActiveWindow();
-        windows = SL::Screen_Capture::GetWindows();
-        usleep(100000);
-    }
-#endif
+    //    auto accessibilityPermissions = SL::Screen_Capture::RequestAccessibilityPermissions();
+    auto activeWindow = SL::Screen_Capture::GetActiveWindow(request);
+    ////
+    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    //
+    // #ifndef WINDOWS
+    //    while (true) {
+    //        activeWindow = SL::Screen_Capture::GetActiveWindow();
+    //        windows = SL::Screen_Capture::GetWindows();
+    //        usleep(100000);
+    //    }
+    // #endif
 
 
 

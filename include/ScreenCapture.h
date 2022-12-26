@@ -20,6 +20,11 @@
 
 namespace SL {
 namespace Screen_Capture {
+    struct SC_LITE_EXTERN SizeValues {
+        int Height = 0;
+        int Width = 0;
+    };
+
     struct SC_LITE_EXTERN Point {
         int x;
         int y;
@@ -36,12 +41,33 @@ namespace Screen_Capture {
         size_t Handle;
         size_t OwnerHandle;
         Point Position;
-
-        Point Size;
+        SizeValues Size;
         std::string Name;
 
         std::vector<WindowAttribute> Attributes;
     };
+
+    struct SC_LITE_EXTERN WindowRequest {
+        size_t Handle;
+        size_t OwnerHandle;
+        Point Position;
+        SizeValues Size;
+        bool Minimized;
+        bool Fullscreen;
+        bool RetrieveIcons;
+    };
+
+    struct SC_LITE_EXTERN WindowsRequest {
+        bool RetrieveIcons;
+    };
+
+    struct SC_LITE_EXTERN Rect {
+        int X = 0;
+        int Y = 0;
+        int Height = 0;
+        int Width = 0;
+    };
+
     struct SC_LITE_EXTERN Monitor {
         int Id = INT32_MAX;
         int Index = INT32_MAX;
@@ -149,10 +175,20 @@ namespace Screen_Capture {
     // will return all attached monitors
     SC_LITE_EXTERN std::shared_ptr<std::vector<Monitor>> GetMonitors();
     // will return all windows
-    SC_LITE_EXTERN std::shared_ptr<std::vector<Window>> GetWindows();
+    SC_LITE_EXTERN std::shared_ptr<std::vector<Window>> GetWindows(const WindowsRequest& request);
 
+    // Make window full screen
+    SC_LITE_EXTERN std::shared_ptr<Window> Fullscreen(const WindowRequest& windowRequest, int display, bool fullscreen);
+    // Make window minimize
+    SC_LITE_EXTERN std::shared_ptr<Window> Minimize(const WindowRequest& windowRequest, bool minimize);
+    // Set rectangle
+    SC_LITE_EXTERN std::shared_ptr<Window> Rectangle(const WindowRequest& windowRequest, const Point& position, const SizeValues& size);
+    // Make window top most
+    SC_LITE_EXTERN std::shared_ptr<Window> Topmost(const WindowRequest& windowRequest);
     // will return active window
-    std::shared_ptr<Window> GetActiveWindow();
+    SC_LITE_EXTERN std::shared_ptr<Window> GetActiveWindow(const WindowsRequest& request);
+    // request accessibility permissions
+    SC_LITE_EXTERN bool RequestAccessibilityPermissions();
 
     typedef std::function<void(const SL::Screen_Capture::Image &img, const Window &window)> WindowCaptureCallback;
     typedef std::function<void(const SL::Screen_Capture::Image &img, const Monitor &monitor)> ScreenCaptureCallback;

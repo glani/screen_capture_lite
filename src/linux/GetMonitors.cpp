@@ -5,33 +5,34 @@
 #include <dlfcn.h>
 
 namespace SL {
-    namespace Screen_Capture {
+namespace Screen_Capture {
 
-        std::shared_ptr<std::vector<Monitor>> GetMonitors() {
-            std::shared_ptr<std::vector<Monitor>> ret = std::make_shared<std::vector<Monitor>>();
+    std::shared_ptr<std::vector<Monitor>> GetMonitors()
+    {
+        std::shared_ptr<std::vector<Monitor>> ret = std::make_shared<std::vector<Monitor>>();
 
-            Display *display = XOpenDisplay(NULL);
-            if (display == NULL) {
-                return ret;
-            }
-            int nmonitors = 0;
-            XineramaScreenInfo *screen = XineramaQueryScreens(display, &nmonitors);
-            if (screen == NULL) {
-                XCloseDisplay(display);
-                return ret;
-            }
-            ret->reserve(nmonitors);
-
-            for (auto i = 0; i < nmonitors; i++) {
-
-                auto name = std::string("Display ") + std::to_string(i);
-                ret->push_back(CreateMonitor(
-                        i, screen[i].screen_number, screen[i].height, screen[i].width, screen[i].x_org, screen[i].y_org,
-                        name, 1.0f));
-            }
-            XFree(screen);
+        Display *display = XOpenDisplay(NULL);
+        if (display == NULL) {
+            return ret;
+        }
+        int nmonitors = 0;
+        XineramaScreenInfo *screen = XineramaQueryScreens(display, &nmonitors);
+        if (screen == NULL) {
             XCloseDisplay(display);
             return ret;
         }
+        ret->reserve(nmonitors);
+
+        for (auto i = 0; i < nmonitors; i++) {
+
+            auto name = std::string("Display ") + std::to_string(i);
+            Monitor monitor =
+                CreateMonitor(i, screen[i].screen_number, screen[i].height, screen[i].width, screen[i].x_org, screen[i].y_org, name, 1.0f);
+            ret->push_back(monitor);
+        }
+        XFree(screen);
+        XCloseDisplay(display);
+        return ret;
     }
-}
+} // namespace Screen_Capture
+} // namespace SL

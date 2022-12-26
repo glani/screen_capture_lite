@@ -42,6 +42,7 @@ else()
 		${X11_Xfixes_LIB}
 		${X11_XTest_LIB}
 		${X11_Xinerama_LIB}
+		${WNCK_LIBRARIES}
 		${CMAKE_THREAD_LIBS_INIT}
 	)
 endif()
