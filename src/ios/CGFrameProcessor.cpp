@@ -13,6 +13,7 @@ namespace Screen_Capture {
         Data = data;
         return ret;
     }
+
     DUPL_RETURN CGFrameProcessor::ProcessFrame(const Window &window)
     {
 
@@ -26,7 +27,7 @@ namespace Screen_Capture {
         auto width = CGImageGetWidth(imageRef);
         auto height = CGImageGetHeight(imageRef);
 
-        if (width != window.Size.x || height != window.Size.y) {
+        if (width != window.Size.Width || height != window.Size.Height) {
             CGImageRelease(imageRef);
             return DUPL_RETURN_ERROR_EXPECTED; // this happens when the window sizes change.
         }

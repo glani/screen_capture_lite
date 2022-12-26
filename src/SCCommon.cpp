@@ -219,26 +219,26 @@ namespace SL {
         int OffsetY(const Monitor &mointor) { return mointor.OffsetY; }
         void OffsetX(Monitor &mointor, int x) { mointor.OffsetX = x; }
         void OffsetY(Monitor &mointor, int y) { mointor.OffsetY = y; }
-        int OffsetX(const Window &mointor) { return mointor.Position.x; }
-        int OffsetY(const Window &mointor) { return mointor.Position.y; }
-        void OffsetX(Window &mointor, int x) { mointor.Position.x = x; }
-        void OffsetY(Window &mointor, int y) { mointor.Position.y = y; }
+        int OffsetX(const Window &mointor) { return mointor.Position.X; }
+        int OffsetY(const Window &mointor) { return mointor.Position.Y; }
+        void OffsetX(Window &mointor, int x) { mointor.Position.X = x; }
+        void OffsetY(Window &mointor, int y) { mointor.Position.Y = y; }
         const char *Name(const Monitor &mointor) { return mointor.Name.c_str(); }
         const char *Name(const Window &mointor) { return mointor.Name.c_str(); }
         int Height(const Monitor &mointor) { return mointor.Height; }
         int Width(const Monitor &mointor) { return mointor.Width; }
         void Height( Monitor &mointor, int h) { mointor.Height = h; }
         void Width( Monitor &mointor, int w) { mointor.Width = w; }
-        int Height(const Window &mointor) { return mointor.Size.y; }
-        int Width(const Window &mointor) { return mointor.Size.x; }
-        void Height(Window &mointor, int h) { mointor.Size.y = h; }
-        void Width(Window &mointor, int w) { mointor.Size.x = w; } 
+        int Height(const Window &mointor) { return mointor.Size.Height; }
+        int Width(const Window &mointor) { return mointor.Size.Width; }
+        void Height(Window &mointor, int h) { mointor.Size.Height = h; }
+        void Width(Window &mointor, int w) { mointor.Size.Width = w; }
         int Height(const ImageRect &rect) { return rect.bottom - rect.top; }
         int Width(const ImageRect &rect) { return rect.right - rect.left; }
         int Height(const Image &img) { return Height(img.Bounds); }
         int Width(const Image &img) { return Width(img.Bounds); }
-        int X(const Point &p) { return p.x; }
-        int Y(const Point &p) { return p.y; }
+        int X(const Point &p) { return p.X; }
+        int Y(const Point &p) { return p.Y; }
         const ImageRect &Rect(const Image &img) { return img.Bounds; } 
         const ImageBGRA *GotoNextRow(const Image &img, const ImageBGRA* current) {
             auto c = reinterpret_cast<const unsigned char*>(current); 

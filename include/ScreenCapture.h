@@ -26,24 +26,27 @@ namespace Screen_Capture {
     };
 
     struct SC_LITE_EXTERN Point {
-        int x;
-        int y;
+        int X = 0;
+        int Y = 0;
     };
+
     struct SC_LITE_EXTERN MousePoint {
         Point Position;
         Point HotSpot;
     };
+
     struct SC_LITE_EXTERN WindowAttribute {
         std::string Code;
         std::string Value;
     };
+
     struct SC_LITE_EXTERN Window {
         size_t Handle;
         size_t OwnerHandle;
         Point Position;
         SizeValues Size;
         std::string Name;
-
+        std::string ProcessName;
         std::vector<WindowAttribute> Attributes;
     };
 
@@ -82,8 +85,12 @@ namespace Screen_Capture {
         int OffsetY = 0;
         int OriginalOffsetX = 0;
         int OriginalOffsetY = 0;
+        Rect Frame;
+        Rect VisibleFrame;
         std::string Name;
+        std::string DisplayName;
         float Scaling = 1.0f;
+        bool Main;
     };
 
     struct Image;
@@ -148,6 +155,21 @@ namespace Screen_Capture {
             }
         }
     }
+
+    inline WindowRequest WindowToWindowRequest(const Window &window)
+    {
+        WindowRequest windowRequest;
+
+        windowRequest.Handle = window.Handle;
+        windowRequest.OwnerHandle = window.OwnerHandle;
+        windowRequest.Position = window.Position;
+        windowRequest.Size = window.Size;
+//        windowRequest.Minimized = window.Minimized;
+//        windowRequest.Fullscreen = window.Fullscreen;
+
+        return windowRequest;
+    }
+
 
     class Timer {
         using Clock =
@@ -225,9 +247,9 @@ namespace Screen_Capture {
     template <typename CAPTURECALLBACK> class ICaptureConfiguration {
       public:
         virtual ~ICaptureConfiguration() {}
-        // When a new frame is available the callback is invoked
+        // When a new Frame is available the callback is invoked
         virtual std::shared_ptr<ICaptureConfiguration<CAPTURECALLBACK>> onNewFrame(const CAPTURECALLBACK &cb) = 0;
-        // When a change in a frame is detected, the callback is invoked
+        // When a change in a Frame is detected, the callback is invoked
         virtual std::shared_ptr<ICaptureConfiguration<CAPTURECALLBACK>> onFrameChanged(const CAPTURECALLBACK &cb) = 0;
         // When a mouse image changes or the mouse changes position, the callback is invoked.
         virtual std::shared_ptr<ICaptureConfiguration<CAPTURECALLBACK>> onMouseChanged(const MouseCallback &cb) = 0;
@@ -250,9 +272,9 @@ namespace Screen_Capture {
     template <typename CAPTURECALLBACK> class ICaptureConfigurationSync {
     public:
         virtual ~ICaptureConfigurationSync() {}
-        // When a new frame is available the callback is invoked
+        // When a new Frame is available the callback is invoked
         virtual std::shared_ptr<ICaptureConfigurationSync<CAPTURECALLBACK>> onNewFrame(const CAPTURECALLBACK &cb) = 0;
-        // When a change in a frame is detected, the callback is invoked
+        // When a change in a Frame is detected, the callback is invoked
         virtual std::shared_ptr<ICaptureConfigurationSync<CAPTURECALLBACK>> onFrameChanged(const CAPTURECALLBACK &cb) = 0;
         // start capturing
         virtual std::shared_ptr<IScreenCaptureManagerSync> startCapturing() = 0;
