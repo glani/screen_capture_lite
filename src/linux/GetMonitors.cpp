@@ -7,8 +7,7 @@
 namespace SL {
 namespace Screen_Capture {
 
-    std::shared_ptr<std::vector<Monitor>> GetMonitors()
-    {
+    std::shared_ptr<std::vector<Monitor>> GetMonitors() {
         std::shared_ptr<std::vector<Monitor>> ret = std::make_shared<std::vector<Monitor>>();
 
         Display *display = XOpenDisplay(NULL);

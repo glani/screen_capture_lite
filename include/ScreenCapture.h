@@ -50,7 +50,7 @@ namespace Screen_Capture {
         std::vector<WindowAttribute> Attributes;
     };
 
-    struct SC_LITE_EXTERN WindowRequest {
+    struct SC_LITE_EXTERN SingleWindowRequest {
         size_t Handle;
         size_t OwnerHandle;
         Point Position;
@@ -60,7 +60,7 @@ namespace Screen_Capture {
         bool RetrieveIcons;
     };
 
-    struct SC_LITE_EXTERN WindowsRequest {
+    struct SC_LITE_EXTERN SearchAllWindowsRequest {
         bool RetrieveIcons;
     };
 
@@ -156,9 +156,9 @@ namespace Screen_Capture {
         }
     }
 
-    inline WindowRequest WindowToWindowRequest(const Window &window)
+    inline SingleWindowRequest WindowToWindowRequest(const Window &window)
     {
-        WindowRequest windowRequest;
+        SingleWindowRequest windowRequest;
 
         windowRequest.Handle = window.Handle;
         windowRequest.OwnerHandle = window.OwnerHandle;
@@ -197,18 +197,20 @@ namespace Screen_Capture {
     // will return all attached monitors
     SC_LITE_EXTERN std::shared_ptr<std::vector<Monitor>> GetMonitors();
     // will return all windows
-    SC_LITE_EXTERN std::shared_ptr<std::vector<Window>> GetWindows(const WindowsRequest& request);
+    SC_LITE_EXTERN std::shared_ptr<std::vector<Window>> GetWindows(const SearchAllWindowsRequest & request);
 
     // Make window full screen
-    SC_LITE_EXTERN std::shared_ptr<Window> Fullscreen(const WindowRequest& windowRequest, int display, bool fullscreen);
+    SC_LITE_EXTERN std::shared_ptr<Window> Fullscreen(const SingleWindowRequest & windowRequest, int display, bool fullscreen);
     // Make window minimize
-    SC_LITE_EXTERN std::shared_ptr<Window> Minimize(const WindowRequest& windowRequest, bool minimize);
+    SC_LITE_EXTERN std::shared_ptr<Window> Minimize(const SingleWindowRequest & windowRequest, bool minimize);
     // Set rectangle
-    SC_LITE_EXTERN std::shared_ptr<Window> Rectangle(const WindowRequest& windowRequest, const Point& position, const SizeValues& size);
+    SC_LITE_EXTERN std::shared_ptr<Window> Rectangle(const SingleWindowRequest & windowRequest, const Point& position, const SizeValues& size);
     // Make window top most
-    SC_LITE_EXTERN std::shared_ptr<Window> Topmost(const WindowRequest& windowRequest);
+    SC_LITE_EXTERN std::shared_ptr<Window> Topmost(const SingleWindowRequest & windowRequest);
     // will return active window
-    SC_LITE_EXTERN std::shared_ptr<Window> GetActiveWindow(const WindowsRequest& request);
+    SC_LITE_EXTERN std::shared_ptr<Window> GetActiveWindow(const SearchAllWindowsRequest & request);
+    // will return requested window
+    SC_LITE_EXTERN std::shared_ptr<Window> GetWindow(const SingleWindowRequest & request);
     // request accessibility permissions
     SC_LITE_EXTERN bool RequestAccessibilityPermissions();
 

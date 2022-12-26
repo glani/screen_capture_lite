@@ -93,174 +93,294 @@ auto TextPropertyToStrings(Display *dpy, const XTextProperty &prop)
 
 namespace SL {
 namespace Screen_Capture {
+    typedef std::function<bool(const XID &window)> RetrieveWindowsConstraint;
     struct _WindowRequest {
         Atom atomPID;
         bool retrieveIcon;
         std::map<std::string, std::string> icons;
     };
+    std::shared_ptr<std::vector<Window>> getWindows(const std::string &netRequestedAtom, bool retrieveIcon, RetrieveWindowsConstraint retrieve);
     void addWindow(Display *display, XID &window, struct _WindowRequest wr, std::vector<Window> &wnd);
-    std::shared_ptr<std::vector<Window>> getWindows(const std::string &netRequestedAtom);
     pid_t determinePid(Display *display, XID &window, Atom &atomPID);
     int getExeForPid(pid_t pid, char *buf, size_t sz);
 
-    bool getAtomList(Screen *screen, XID &window, Atom atom, Atom **atoms, int *len)
+    bool getAtomList(Screen *screen, XID &window, Atom atom, Atom **atoms, int *len);
+    bool getCardinalList(Display *display, XID &window, Atom atom, unsigned long **cardinals, int *len);
+    bool getWindowPosition(Screen *screen, XID &window, int *xp, int *yp);
+    bool getFrameExtents(Display *display, XID &window, int *left_frame, int *right_frame, int *top_frame, int *bottom_frame);
+    void argbdataToPixdata(unsigned long *argb_data, int len, unsigned char **pixdata);
+    bool findBestSize(unsigned long *data, unsigned long nitems, int ideal_size, int *width, int *height, unsigned long **start);
+    bool readRgbIcon(Display *display, XID &window, int *width, int *height, std::string &icon);
+
+    std::shared_ptr<Window> GetWindow(const SingleWindowRequest &request)
     {
-        Display *display;
-        Atom type;
-        int format;
-        unsigned long nitems;
-        unsigned long bytes_after;
-        Atom *data;
-        int err, result;
-
-        display = DisplayOfScreen(screen);
-
-        *atoms = NULL;
-        *len = 0;
-
-        type = None;
-        result = XGetWindowProperty(display, window, atom, 0, (~0L), False, XA_ATOM, &type, &format, &nitems, &bytes_after,
-                                    reinterpret_cast<unsigned char **>(&data));
-        if (result != Success) {
-            return false;
+        auto res = getWindows(std::string("_NET_CLIENT_LIST"), request.RetrieveIcons, [&](const XID &id) { return reinterpret_cast<XID>(request.Handle) == id; });
+        if (!res->empty()) {
+            return std::make_shared<Window>(res->front());
         }
+        else {
+            return std::shared_ptr<Window>();
+        }
+    }
 
-        if (type != XA_ATOM) {
+    std::shared_ptr<Window> GetActiveWindow(const SearchAllWindowsRequest &request)
+    {
+        auto res = getWindows(std::string("_NET_ACTIVE_WINDOW"), request.RetrieveIcons, [&](const XID &id) { return true; });
+        if (!res->empty()) {
+            return std::make_shared<Window>(res->front());
+        }
+        else {
+            return std::shared_ptr<Window>();
+        }
+    }
+
+    std::shared_ptr<std::vector<Window>> GetWindows(const SearchAllWindowsRequest &request)
+    {
+        return getWindows(std::string("_NET_CLIENT_LIST"), request.RetrieveIcons, [&](const XID &id) { return true; });
+    }
+
+    // Make window full screen
+    std::shared_ptr<Window> Fullscreen(const SingleWindowRequest &windowRequests, int display, bool fullscreen)
+    {
+        std::shared_ptr<Window> res;
+        return res;
+    }
+
+    // Make window minimize
+    std::shared_ptr<Window> Minimize(const SingleWindowRequest &windowRequest, bool minimize)
+    {
+        std::shared_ptr<Window> res;
+        return res;
+    }
+
+    // Set rectangle
+    std::shared_ptr<Window> Rectangle(const SingleWindowRequest &windowRequest, const Point &position, const SizeValues &size)
+    {
+        std::shared_ptr<Window> res;
+        return res;
+    }
+
+    // Make window top most
+    std::shared_ptr<Window> Topmost(const SingleWindowRequest &windowRequest)
+    {
+        std::shared_ptr<Window> res;
+        return res;
+    }
+
+    std::shared_ptr<std::vector<Window>> getWindows(const std::string &netRequestedAtom, bool retrieveIcon, RetrieveWindowsConstraint retrieve)
+    {
+        std::shared_ptr<std::vector<Window>> result = std::make_shared<std::vector<Window>>();
+
+        auto *display = XOpenDisplay(NULL);
+
+        struct _WindowRequest wr;
+        wr.atomPID = XInternAtom(display, "_NET_WM_PID", True);
+        wr.retrieveIcon = retrieveIcon;
+
+        Atom atomWindowsRequested = XInternAtom(display, netRequestedAtom.c_str(), true);
+        Atom actualType;
+        int format;
+        unsigned long numItems, bytesAfter;
+        unsigned char *data = 0;
+        int status = XGetWindowProperty(display, XDefaultRootWindow(display), atomWindowsRequested, 0L, (~0L), false, AnyPropertyType, &actualType,
+                                        &format, &numItems, &bytesAfter, &data);
+        if (status >= Success && numItems) {
+            auto array = (XID *)data;
+            for (decltype(numItems) k = 0; k < numItems; k++) {
+                auto window = array[k];
+                if (retrieve(window)) {
+                    addWindow(display, window, wr, *result);
+                }
+            }
             XFree(data);
-            return false;
         }
-
-        *atoms = new Atom[nitems];
-        memcpy(*atoms, data, sizeof(Atom) * nitems);
-        *len = nitems;
-        XFree(data);
-
-        return true;
+        XCloseDisplay(display);
+        return result;
     }
 
-    bool getCardinalList(Display *display, XID &window, Atom atom, unsigned long **cardinals, int *len)
+    bool RequestAccessibilityPermissions() { return true; }
+
+    void addWindow(Display *display, XID &window, struct _WindowRequest wr, std::vector<Window> &wnd)
     {
-        Atom type;
-        int format;
-        unsigned long nitems;
-        unsigned long bytes_after;
-        unsigned long *nums;
-        int result;
 
-        *cardinals = NULL;
-        *len = 0;
-
-        type = None;
-        result = XGetWindowProperty(display, window, atom, 0, (~0L), False, XA_CARDINAL, &type, &format, &nitems, &bytes_after,
-                                    reinterpret_cast<unsigned char **>(&nums));
-        if (result != Success)
-            return false;
-
-        if (type != XA_CARDINAL) {
-            XFree(nums);
-            return false;
-        }
-
-        *cardinals = new unsigned long[nitems];
-        memcpy(*cardinals, nums, sizeof(unsigned long) * nitems);
-        *len = nitems;
-
-        XFree(nums);
-
-        return true;
-    }
-
-    bool getWindowPosition(Screen *screen, XID &window, int *xp, int *yp)
-    {
-        int x, y;
-        XID child;
-
-        x = 0;
-        y = 0;
-
-        Display *display = DisplayOfScreen(screen);
-        XID root = RootWindowOfScreen(screen);
-
-        XTranslateCoordinates(display, window, root, 0, 0, &x, &y, &child);
-
-        if (xp) {
-            *xp = x;
-        }
-        if (yp) {
-            *yp = y;
-        }
-        return true;
-    }
-
-    bool getFrameExtents(Display *display, XID &window, int *left_frame, int *right_frame, int *top_frame, int *bottom_frame)
-    {
-        unsigned long *p_size;
-        int n_size;
-        bool retval = false;
-        p_size = NULL;
-        n_size = 0;
-
-        Atom atomFrameExtents = XInternAtom(display, "_NET_FRAME_EXTENTS", true);
-        getCardinalList(display, window, atomFrameExtents, &p_size, &n_size);
-
-        if (p_size != NULL && n_size == 4) {
-            *left_frame = p_size[0];
-            *right_frame = p_size[1];
-            *top_frame = p_size[2];
-            *bottom_frame = p_size[3];
-
-            retval = true;
-        }
-
-        if (p_size == NULL) {
-            Atom atomGtkFrameExtents = XInternAtom(display, "_GTK_FRAME_EXTENTS", true);
-            getCardinalList(display, window, atomGtkFrameExtents, &p_size, &n_size);
-
-            if (p_size != NULL && n_size == 4) {
-                *left_frame = -p_size[0];
-                *right_frame = -p_size[1];
-                *top_frame = -p_size[2];
-                *bottom_frame = -p_size[3];
-
-                retval = true;
+        pid_t ownerPid = 0;
+        std::string exec;
+        if (wr.atomPID != None) {
+            const int size = 2048;
+            ownerPid = determinePid(display, window, wr.atomPID);
+            auto buf = std::unique_ptr<char[]>(new char[size]);
+            int len;
+            if (-1 != (len = getExeForPid(ownerPid, buf.get(), size))) {
+                exec.assign(buf.get(), len);
             }
         }
 
-        if (p_size != NULL) {
-            delete p_size;
-        }
+        auto wm_name = GetWMName(display, window);
 
-        return retval;
+        auto candidates = TextPropertyToStrings(display, wm_name.get());
+        auto name = candidates.empty() ? ""s : std::move(candidates.front());
+        if (!name.empty()) {
+            Window w = {};
+            w.Handle = reinterpret_cast<size_t>(window);
+            w.OwnerHandle = ownerPid;
+
+            XWindowAttributes wndattr;
+            XGetWindowAttributes(display, window, &wndattr);
+
+            int leftFrame = 0;
+            int rightFrame = 0;
+            int topFrame = 0;
+            int bottomFrame = 0;
+            bool frameExternal = getFrameExtents(display, window, &leftFrame, &rightFrame, &topFrame, &bottomFrame);
+            if (frameExternal) {
+            }
+
+            int xp = 0;
+            int yp = 0;
+            getWindowPosition(wndattr.screen, window, &xp, &yp);
+
+            w.Position = Point{wndattr.x, wndattr.y};
+            w.Size = SizeValues{wndattr.width, wndattr.height};
+            w.Name = name;
+
+            XClassHint hint;
+            XGetClassHint(display, window, &hint);
+            WindowAttribute attributeClass;
+            attributeClass.Code = std::string(S_RES_CLASS);
+            attributeClass.Value = hint.res_class != NULL ? std::string(hint.res_class) : ""s;
+            w.Attributes.emplace_back(attributeClass);
+
+            WindowAttribute attributeName;
+            attributeName.Code = std::string(S_RES_NAME);
+            attributeName.Value = hint.res_name != NULL ? std::string(hint.res_name) : ""s;
+            w.Attributes.emplace_back(attributeName);
+
+            w.ProcessName = attributeName.Value;
+
+            XFree(hint.res_class);
+            XFree(hint.res_name);
+
+            if (!exec.empty()) {
+                WindowAttribute attributeExec;
+                attributeExec.Code = std::string(S_RES_START_ABSOLUTE_URL);
+                attributeExec.Value = exec;
+                w.Attributes.emplace_back(attributeExec);
+            }
+
+            Atom atomWmState = XInternAtom(display, "_NET_WM_STATE", true);
+            Atom *atoms = NULL;
+            int n_atoms = 0;
+            if (getAtomList(wndattr.screen, window, atomWmState, &atoms, &n_atoms)) {
+                Atom atomWmStateHidden = XInternAtom(display, "_NET_WM_STATE_HIDDEN", true);
+                Atom atomWmStateFullscreen = XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", true);
+                Atom atomWmStateMaxVert = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_VERT", true);
+                Atom atomWmStateMaxHorz = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_HORZ", true);
+                bool visible = true;
+                bool fullscreen = false;
+                bool maxVert = false;
+                bool maxHorz = false;
+                for (int i = 0; i < n_atoms; i++) {
+                    if (atoms[i] == atomWmStateHidden) {
+                        visible = false;
+                    }
+                    else if (atoms[i] == atomWmStateFullscreen) {
+                        fullscreen = true;
+                    }
+                    else if (atoms[i] == atomWmStateMaxVert) {
+                        maxVert = true;
+                    }
+                    else if (atoms[i] == atomWmStateMaxHorz) {
+                        maxHorz = true;
+                    }
+                }
+
+                WindowAttribute attributeVisible;
+                attributeVisible.Code = std::string(S_RES_VISIBLE);
+                attributeVisible.Value = visible ? std::string(S_TRUE) : std::string(S_FALSE);
+                w.Attributes.emplace_back(attributeVisible);
+
+                WindowAttribute attributeFullscreen;
+                attributeFullscreen.Code = std::string(S_RES_FULLSCREEN);
+                attributeFullscreen.Value = fullscreen ? std::string(S_TRUE) : std::string(S_FALSE);
+                w.Attributes.emplace_back(attributeFullscreen);
+
+                WindowAttribute attributeMaximized;
+                attributeMaximized.Code = std::string(S_RES_MAXIMIZED);
+                attributeMaximized.Value = (maxVert && maxHorz) ? std::string(S_TRUE) : std::string(S_FALSE);
+                w.Attributes.emplace_back(attributeMaximized);
+            }
+            if (atoms) {
+                delete[] atoms;
+            }
+
+            if (wr.retrieveIcon) {
+                int width;
+                int height;
+                std::string iconData;
+                auto it = wr.icons.find(attributeClass.Value);
+                if (it != wr.icons.end()) {
+                    WindowAttribute attributeIcon;
+                    attributeIcon.Code = std::string(S_RES_ICON_URL);
+                    attributeIcon.Value = it->second;
+                    w.Attributes.emplace_back(attributeIcon);
+                    WindowAttribute attributeIconExist;
+                    attributeIconExist.Code = std::string(S_RES_ICON_EXIST);
+                    attributeIconExist.Value = S_TRUE;
+                    w.Attributes.emplace_back(attributeIconExist);
+                }
+                else {
+                    bool iconExists = readRgbIcon(display, window, &width, &height, iconData);
+                    if (iconExists) {
+                        WindowAttribute attributeIcon;
+                        attributeIcon.Code = std::string(S_RES_ICON_URL);
+                        attributeIcon.Value = iconData;
+                        w.Attributes.emplace_back(attributeIcon);
+                        WindowAttribute attributeIconExist;
+                        attributeIconExist.Code = std::string(S_RES_ICON_EXIST);
+                        attributeIconExist.Value = S_TRUE;
+                        w.Attributes.emplace_back(attributeIconExist);
+
+                        wr.icons.emplace(std::make_pair(std::string(S_RES_ICON_URL), iconData));
+                    }
+                    else {
+                        WindowAttribute attributeIconExist;
+                        attributeIconExist.Code = std::string(S_RES_ICON_EXIST);
+                        attributeIconExist.Value = S_FALSE;
+                        w.Attributes.emplace_back(attributeIconExist);
+                    }
+                }
+            }
+            wnd.emplace_back(w);
+        }
     }
 
-    void argbdataToPixdata(unsigned long *argb_data, int len, unsigned char **pixdata)
+    pid_t determinePid(Display *display, XID &window, Atom &atomPID)
     {
-        unsigned char *p;
-        int i;
-
-        *pixdata = new unsigned char[len * 4];
-        p = *pixdata;
-
-        /* One could speed this up a lot. */
-        i = 0;
-        while (i < len) {
-            unsigned int argb;
-            unsigned int rgba;
-
-            argb = argb_data[i];
-            rgba = (argb << 8) | (argb >> 24);
-
-            *p = rgba >> 24;
-            ++p;
-            *p = (rgba >> 16) & 0xff;
-            ++p;
-            *p = (rgba >> 8) & 0xff;
-            ++p;
-            *p = rgba & 0xff;
-            ++p;
-
-            ++i;
+        struct FreeWrapRAII {
+            void *data;
+            FreeWrapRAII(void *data) : data(data) {}
+            ~FreeWrapRAII() { XFree(data); }
+        };
+        // Get the PID for the given Window
+        Atom type;
+        int format;
+        unsigned long nItems;
+        unsigned long bytesAfter;
+        unsigned char *propPID = 0;
+        if (Success == XGetWindowProperty(display, window, atomPID, 0, 1, False, XA_CARDINAL, &type, &format, &nItems, &bytesAfter, &propPID)) {
+            if (propPID != 0) {
+                FreeWrapRAII tmp(propPID);
+                return *reinterpret_cast<pid_t *>(propPID);
+            }
         }
+        return 0;
+    }
+
+    int getExeForPid(pid_t pid, char *buf, size_t sz)
+    {
+        char path[32];
+        sprintf(path, "/proc/%d/exe", pid);
+        return readlink(path, buf, sz);
     }
 
     bool findBestSize(unsigned long *data, unsigned long nitems, int ideal_size, int *width, int *height, unsigned long **start)
@@ -381,253 +501,164 @@ namespace Screen_Capture {
         return true;
     }
 
-    std::shared_ptr<Window> GetActiveWindow(const WindowsRequest &request)
+    void argbdataToPixdata(unsigned long *argb_data, int len, unsigned char **pixdata)
     {
-        auto res = getWindows(std::string("_NET_ACTIVE_WINDOW"));
-        if (!res->empty()) {
-            return std::make_shared<Window>(res->front());
-        }
-        else {
-            return std::shared_ptr<Window>();
-        }
-    }
+        unsigned char *p;
+        int i;
 
-    std::shared_ptr<std::vector<Window>> GetWindows(const WindowsRequest &request) { return getWindows(std::string("_NET_CLIENT_LIST")); }
+        *pixdata = new unsigned char[len * 4];
+        p = *pixdata;
 
-    // Make window full screen
-    std::shared_ptr<Window> Fullscreen(const WindowRequest &windowRequests, int display, bool fullscreen)
-    {
-        std::shared_ptr<Window> res;
-        return res;
-    }
+        /* One could speed this up a lot. */
+        i = 0;
+        while (i < len) {
+            unsigned int argb;
+            unsigned int rgba;
 
-    // Make window minimize
-    std::shared_ptr<Window> Minimize(const WindowRequest &windowRequest, bool minimize)
-    {
-        std::shared_ptr<Window> res;
-        return res;
-    }
+            argb = argb_data[i];
+            rgba = (argb << 8) | (argb >> 24);
 
-    // Set rectangle
-    std::shared_ptr<Window> Rectangle(const WindowRequest &windowRequest, const Point &position, const SizeValues &size)
-    {
-        std::shared_ptr<Window> res;
-        return res;
-    }
+            *p = rgba >> 24;
+            ++p;
+            *p = (rgba >> 16) & 0xff;
+            ++p;
+            *p = (rgba >> 8) & 0xff;
+            ++p;
+            *p = rgba & 0xff;
+            ++p;
 
-    // Make window top most
-    std::shared_ptr<Window> Topmost(const WindowRequest &windowRequest)
-    {
-        std::shared_ptr<Window> res;
-        return res;
-    }
-
-    std::shared_ptr<std::vector<Window>> getWindows(const std::string &netRequestedAtom)
-    {
-        std::shared_ptr<std::vector<Window>> result = std::make_shared<std::vector<Window>>();
-
-        auto *display = XOpenDisplay(NULL);
-
-        struct _WindowRequest wr;
-        wr.atomPID = XInternAtom(display, "_NET_WM_PID", True);
-
-        Atom atomWindowsRequested = XInternAtom(display, netRequestedAtom.c_str(), true);
-        Atom actualType;
-        int format;
-        unsigned long numItems, bytesAfter;
-        unsigned char *data = 0;
-        int status = XGetWindowProperty(display, XDefaultRootWindow(display), atomWindowsRequested, 0L, (~0L), false, AnyPropertyType, &actualType,
-                                        &format, &numItems, &bytesAfter, &data);
-        if (status >= Success && numItems) {
-            auto array = (XID *)data;
-            for (decltype(numItems) k = 0; k < numItems; k++) {
-                auto window = array[k];
-                addWindow(display, window, wr, *result);
-            }
-            XFree(data);
-        }
-        XCloseDisplay(display);
-        return result;
-    }
-
-    void addWindow(Display *display, XID &window, struct _WindowRequest wr, std::vector<Window> &wnd)
-    {
-
-        pid_t ownerPid = 0;
-        std::string exec;
-        if (wr.atomPID != None) {
-            const int size = 2048;
-            ownerPid = determinePid(display, window, wr.atomPID);
-            auto buf = std::unique_ptr<char[]>(new char[size]);
-            int len;
-            if (-1 != (len = getExeForPid(ownerPid, buf.get(), size))) {
-                exec.assign(buf.get(), len);
-            }
-        }
-
-        auto wm_name = GetWMName(display, window);
-
-        auto candidates = TextPropertyToStrings(display, wm_name.get());
-        auto name = candidates.empty() ? ""s : std::move(candidates.front());
-        if (!name.empty()) {
-            Window w = {};
-            w.Handle = reinterpret_cast<size_t>(window);
-            w.OwnerHandle = ownerPid;
-
-            XWindowAttributes wndattr;
-            XGetWindowAttributes(display, window, &wndattr);
-
-            int leftFrame = 0;
-            int rightFrame = 0;
-            int topFrame = 0;
-            int bottomFrame = 0;
-            bool frameExternal = getFrameExtents(display, window, &leftFrame, &rightFrame, &topFrame, &bottomFrame);
-            if (frameExternal) {
-            }
-
-            int xp = 0;
-            int yp = 0;
-            getWindowPosition(wndattr.screen, window, &xp, &yp);
-
-            w.Position = Point{wndattr.x, wndattr.y};
-            w.Size = SizeValues{wndattr.width, wndattr.height};
-            w.Name = name;
-
-            XClassHint hint;
-            XGetClassHint(display, window, &hint);
-            WindowAttribute attributeClass;
-            attributeClass.Code = std::string(S_RES_CLASS);
-            attributeClass.Value = hint.res_class != NULL ? std::string(hint.res_class) : ""s;
-            w.Attributes.emplace_back(attributeClass);
-
-            WindowAttribute attributeName;
-            attributeName.Code = std::string(S_RES_NAME);
-            attributeName.Value = hint.res_name != NULL ? std::string(hint.res_name) : ""s;
-            w.Attributes.emplace_back(attributeName);
-
-            w.ProcessName = attributeName.Value;
-
-            XFree(hint.res_class);
-            XFree(hint.res_name);
-
-            if (!exec.empty()) {
-                WindowAttribute attributeExec;
-                attributeExec.Code = std::string(S_RES_START_ABSOLUTE_URL);
-                attributeExec.Value = exec;
-                w.Attributes.emplace_back(attributeExec);
-            }
-
-            Atom atomWmState = XInternAtom(display, "_NET_WM_STATE", true);
-            Atom *atoms = NULL;
-            int n_atoms = 0;
-            if (getAtomList(wndattr.screen, window, atomWmState, &atoms, &n_atoms)) {
-                Atom atomWmStateHidden = XInternAtom(display, "_NET_WM_STATE_HIDDEN", true);
-                Atom atomWmStateFullscreen = XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", true);
-                Atom atomWmStateMaxVert = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_VERT", true);
-                Atom atomWmStateMaxHorz = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_HORZ", true);
-                bool visible = true;
-                bool fullscreen = false;
-                bool maxVert = false;
-                bool maxHorz = false;
-                for (int i = 0; i < n_atoms; i++) {
-                    if (atoms[i] == atomWmStateHidden) {
-                        visible = false;
-                    } else if (atoms[i] == atomWmStateFullscreen) {
-                        fullscreen = true;
-                    } else if (atoms[i] == atomWmStateMaxVert) {
-                        maxVert = true;
-                    } else if (atoms[i] == atomWmStateMaxHorz) {
-                        maxHorz = true;
-                    }
-                }
-
-                WindowAttribute attributeVisible;
-                attributeVisible.Code = std::string(S_RES_VISIBLE);
-                attributeVisible.Value = visible ? std::string(S_TRUE): std::string(S_FALSE);
-                w.Attributes.emplace_back(attributeVisible);
-
-                WindowAttribute attributeFullscreen;
-                attributeFullscreen.Code = std::string(S_RES_FULLSCREEN);
-                attributeFullscreen.Value = fullscreen ? std::string(S_TRUE): std::string(S_FALSE);
-                w.Attributes.emplace_back(attributeFullscreen);
-
-                WindowAttribute attributeMaximized;
-                attributeMaximized.Code = std::string(S_RES_MAXIMIZED);
-                attributeMaximized.Value = (maxVert && maxHorz) ? std::string(S_TRUE): std::string(S_FALSE);
-                w.Attributes.emplace_back(attributeMaximized);
-            }
-            if (atoms) {
-                delete [] atoms;
-            }
-
-            if (wr.retrieveIcon) {
-                int width;
-                int height;
-                std::string iconData;
-                auto it = wr.icons.find(attributeClass.Value);
-                if (it != wr.icons.end()) {
-                    WindowAttribute attributeIcon;
-                    attributeIcon.Code = std::string(S_RES_ICON_URL);
-                    attributeIcon.Value = it->second;
-                    w.Attributes.emplace_back(attributeIcon);
-                    WindowAttribute attributeIconExist;
-                    attributeIconExist.Code = std::string(S_RES_ICON_EXIST);
-                    attributeIconExist.Value = S_TRUE;
-                    w.Attributes.emplace_back(attributeIconExist);
-                }
-                else {
-                    bool iconExists = readRgbIcon(display, window, &width, &height, iconData);
-                    if (iconExists) {
-                        WindowAttribute attributeIcon;
-                        attributeIcon.Code = std::string(S_RES_ICON_URL);
-                        attributeIcon.Value = iconData;
-                        w.Attributes.emplace_back(attributeIcon);
-                        WindowAttribute attributeIconExist;
-                        attributeIconExist.Code = std::string(S_RES_ICON_EXIST);
-                        attributeIconExist.Value = S_TRUE;
-                        w.Attributes.emplace_back(attributeIconExist);
-
-                        wr.icons.emplace(std::make_pair(std::string(S_RES_ICON_URL), iconData));
-                    }
-                    else {
-                        WindowAttribute attributeIconExist;
-                        attributeIconExist.Code = std::string(S_RES_ICON_EXIST);
-                        attributeIconExist.Value = S_FALSE;
-                        w.Attributes.emplace_back(attributeIconExist);
-                    }
-                }
-            }
-            wnd.emplace_back(w);
+            ++i;
         }
     }
 
-    pid_t determinePid(Display *display, XID &window, Atom &atomPID)
+    bool getFrameExtents(Display *display, XID &window, int *left_frame, int *right_frame, int *top_frame, int *bottom_frame)
     {
-        struct FreeWrapRAII {
-            void *data;
-            FreeWrapRAII(void *data) : data(data) {}
-            ~FreeWrapRAII() { XFree(data); }
-        };
-        // Get the PID for the given Window
+        unsigned long *p_size;
+        int n_size;
+        bool retval = false;
+        p_size = NULL;
+        n_size = 0;
+
+        Atom atomFrameExtents = XInternAtom(display, "_NET_FRAME_EXTENTS", true);
+        getCardinalList(display, window, atomFrameExtents, &p_size, &n_size);
+
+        if (p_size != NULL && n_size == 4) {
+            *left_frame = p_size[0];
+            *right_frame = p_size[1];
+            *top_frame = p_size[2];
+            *bottom_frame = p_size[3];
+
+            retval = true;
+        }
+
+        if (p_size == NULL) {
+            Atom atomGtkFrameExtents = XInternAtom(display, "_GTK_FRAME_EXTENTS", true);
+            getCardinalList(display, window, atomGtkFrameExtents, &p_size, &n_size);
+
+            if (p_size != NULL && n_size == 4) {
+                *left_frame = -p_size[0];
+                *right_frame = -p_size[1];
+                *top_frame = -p_size[2];
+                *bottom_frame = -p_size[3];
+
+                retval = true;
+            }
+        }
+
+        if (p_size != NULL) {
+            delete p_size;
+        }
+
+        return retval;
+    }
+
+    bool getWindowPosition(Screen *screen, XID &window, int *xp, int *yp)
+    {
+        int x, y;
+        XID child;
+
+        x = 0;
+        y = 0;
+
+        Display *display = DisplayOfScreen(screen);
+        XID root = RootWindowOfScreen(screen);
+
+        XTranslateCoordinates(display, window, root, 0, 0, &x, &y, &child);
+
+        if (xp) {
+            *xp = x;
+        }
+        if (yp) {
+            *yp = y;
+        }
+        return true;
+    }
+
+    bool getCardinalList(Display *display, XID &window, Atom atom, unsigned long **cardinals, int *len)
+    {
         Atom type;
         int format;
-        unsigned long nItems;
-        unsigned long bytesAfter;
-        unsigned char *propPID = 0;
-        if (Success == XGetWindowProperty(display, window, atomPID, 0, 1, False, XA_CARDINAL, &type, &format, &nItems, &bytesAfter, &propPID)) {
-            if (propPID != 0) {
-                FreeWrapRAII tmp(propPID);
-                return *reinterpret_cast<pid_t *>(propPID);
-            }
+        unsigned long nitems;
+        unsigned long bytes_after;
+        unsigned long *nums;
+        int result;
+
+        *cardinals = NULL;
+        *len = 0;
+
+        type = None;
+        result = XGetWindowProperty(display, window, atom, 0, (~0L), False, XA_CARDINAL, &type, &format, &nitems, &bytes_after,
+                                    reinterpret_cast<unsigned char **>(&nums));
+        if (result != Success)
+            return false;
+
+        if (type != XA_CARDINAL) {
+            XFree(nums);
+            return false;
         }
-        return 0;
+
+        *cardinals = new unsigned long[nitems];
+        memcpy(*cardinals, nums, sizeof(unsigned long) * nitems);
+        *len = nitems;
+
+        XFree(nums);
+
+        return true;
     }
 
-    int getExeForPid(pid_t pid, char *buf, size_t sz)
+    bool getAtomList(Screen *screen, XID &window, Atom atom, Atom **atoms, int *len)
     {
-        char path[32];
-        sprintf(path, "/proc/%d/exe", pid);
-        return readlink(path, buf, sz);
+        Display *display;
+        Atom type;
+        int format;
+        unsigned long nitems;
+        unsigned long bytes_after;
+        Atom *data;
+        int err, result;
+
+        display = DisplayOfScreen(screen);
+
+        *atoms = NULL;
+        *len = 0;
+
+        type = None;
+        result = XGetWindowProperty(display, window, atom, 0, (~0L), False, XA_ATOM, &type, &format, &nitems, &bytes_after,
+                                    reinterpret_cast<unsigned char **>(&data));
+        if (result != Success) {
+            return false;
+        }
+
+        if (type != XA_ATOM) {
+            XFree(data);
+            return false;
+        }
+
+        *atoms = new Atom[nitems];
+        memcpy(*atoms, data, sizeof(Atom) * nitems);
+        *len = nitems;
+        XFree(data);
+
+        return true;
     }
 } // namespace Screen_Capture
 } // namespace SL

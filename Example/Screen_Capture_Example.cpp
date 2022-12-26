@@ -192,7 +192,7 @@ void createwindowgrabber()
     framgrabber = nullptr;
     framgrabber =
         SL::Screen_Capture::CreateCaptureConfiguration([]() {
-            SL::Screen_Capture::WindowsRequest request;
+            SL::Screen_Capture::SearchAllWindowsRequest request;
             request.RetrieveIcons = false;
             auto windows = SL::Screen_Capture::GetWindows(request);
             std::string srchterm = "cmake";
@@ -257,9 +257,9 @@ void createwindowgrabber()
     framgrabber->setFrameChangeInterval(std::chrono::milliseconds(100));
     framgrabber->setMouseChangeInterval(std::chrono::milliseconds(100));
 }
-int main(int arch, char** argv)
+int main(int arch, char **argv)
 {
-    SL::Screen_Capture::WindowsRequest request;
+    SL::Screen_Capture::SearchAllWindowsRequest request;
     request.RetrieveIcons = true;
     std::shared_ptr<std::vector<SL::Screen_Capture::Window>> windows = SL::Screen_Capture::GetWindows(request);
     if (windows) {
@@ -267,13 +267,24 @@ int main(int arch, char** argv)
         auto fit = std::find_if(windows->begin(), windows->end(), [&](const SL::Screen_Capture::Window &elem) { return elem.ProcessName == reqApp; });
         if (fit != windows->end()) {
 
-            SL::Screen_Capture::WindowRequest req = SL::Screen_Capture::WindowToWindowRequest(*fit);
+            SL::Screen_Capture::SingleWindowRequest req = SL::Screen_Capture::WindowToWindowRequest(*fit);
             //            SL::Screen_Capture::Fullscreen(req, -1, true);
             //            SL::Screen_Capture::Fullscreen(req, -1, false);
             SL::Screen_Capture::Topmost(req);
             SL::Screen_Capture::Rectangle(req, {req.Position.X + 100, req.Position.Y + 100}, req.Size);
             //            SL::Screen_Capture::Minimize(req, false);
             //            SL::Screen_Capture::Minimize(req, true);
+        }
+
+        if (!windows->empty()) {
+            SL::Screen_Capture::SingleWindowRequest reqSingle = SL::Screen_Capture::WindowToWindowRequest(windows->front());
+            auto search = SL::Screen_Capture::GetWindow(reqSingle);
+            if (search) {
+                std::cout << "Found " << search->Name << " " << search->ProcessName << std::endl;
+            }
+            else {
+                std::cout << "Not Found " << std::endl;
+            }
         }
     }
     //    windows = SL::Screen_Capture::GetWindows();
@@ -283,22 +294,25 @@ int main(int arch, char** argv)
     //    windows = SL::Screen_Capture::GetWindows();
     //    windows = SL::Screen_Capture::GetWindows();
 
-//    auto activeWindow = SL::Screen_Capture::GetActiveWindow();
-//    activeWindow = SL::Screen_Capture::GetActiveWindow();
-//    activeWindow = SL::Screen_Capture::GetActiveWindow();
-//    activeWindow = SL::Screen_Capture::GetActiveWindow();
-//    activeWindow = SL::Screen_Capture::GetActiveWindow();
-//    activeWindow = SL::Screen_Capture::GetActiveWindow();
-//    activeWindow = SL::Screen_Capture::GetActiveWindow();
-//    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    SL::Screen_Capture::SearchAllWindowsRequest gar;
+    gar.RetrieveIcons = true;
+    auto activeWindow = SL::Screen_Capture::GetActiveWindow(gar);
 
-//#ifndef WINDOWS
-//    while (true) {
-//        activeWindow = SL::Screen_Capture::GetActiveWindow();
-//        windows = SL::Screen_Capture::GetWindows();
-//        usleep(100000);
-//    }
-//#endif
+    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
+    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
+
+    // #ifndef WINDOWS
+    //     while (true) {
+    //         activeWindow = SL::Screen_Capture::GetActiveWindow();
+    //         windows = SL::Screen_Capture::GetWindows();
+    //         usleep(100000);
+    //     }
+    // #endif
 
     std::srand(std::time(nullptr));
     std::srand(std::time(nullptr));
