@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.14)
 project(screen_capture_lite)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -14,8 +14,8 @@ if (WIN32)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
     else ()
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic")
-        add_definitions("-DUNICODE -D_UNICODE" )
-        add_definitions("-D_WIN32_WINNT=0x0600" )
+        add_definitions("-DUNICODE -D_UNICODE")
+        add_definitions("-D_WIN32_WINNT=0x0600")
     endif ()
     set(SCREEN_CAPTURE_PLATFORM_SRC
             src/windows/GetWindows.cpp
@@ -92,6 +92,7 @@ else ()
             src/linux/X11FrameProcessorSync.cpp
             src/linux/X11FrameProcessor.cpp
             src/linux/GetMonitors.cpp
+            src/linux/GetWindows.cpp
             src/linux/Init.cpp
             src/linux/png/lodepng.cpp
             src/linux/png/lodepng.h
@@ -119,17 +120,11 @@ else ()
         message(FATAL_ERROR "X11 xcb is required, but not found!")
     endif ()
 
-    if (NOT DEFINED WNCK_FOUND OR TRUE)
-        list(APPEND SCREEN_CAPTURE_PLATFORM_SRC
-            src/linux/GetWindows.cpp
-        )
-        message(STATUS "WNCK extensions are missed use native!")
-    else()
-        message(STATUS "WNCK extensions are found!")
-        list(APPEND SCREEN_CAPTURE_PLATFORM_SRC
-                src/linux/GetWindowsLibWnck.cpp.1
-        )
-        add_definitions(-D_USE_LIBWNCK -DWNCK_I_KNOW_THIS_IS_UNSTABLE)
+    if (!X11_xcb_icccm_FOUND)
+        message(FATAL_ERROR "X11 xcb icccm is required, but not found!")
+    endif ()
+    if (!X11_xcb_icccm_LIB)
+        message(FATAL_ERROR "X11 xcb icccm is required, but not found!")
     endif ()
 
     if (!WNCK_Xfixes_LIB)
@@ -140,6 +135,7 @@ else ()
             include/linux
             ${X11_INCLUDE_DIR}
             ${X11_xcb_INCLUDE_PATH}
+            ${X11_xcb_icccm_INCLUDE_PATH}
             ${X11_XCB_XINERAMA_INCLUDE_PATH}
             ${WNCK_INCLUDE_DIRS}
             )
@@ -220,9 +216,9 @@ enable_testing()
 
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-#    if (LINUX OR APPLE)
-        add_subdirectory(Example)
-#    endif ()
+    #    if (LINUX OR APPLE)
+    add_subdirectory(Example)
+    #    endif ()
 endif (CMAKE_BUILD_TYPE STREQUAL "Debug")
 
 

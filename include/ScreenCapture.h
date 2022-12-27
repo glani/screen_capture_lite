@@ -21,13 +21,21 @@
 namespace SL {
 namespace Screen_Capture {
     struct SC_LITE_EXTERN SizeValues {
-        int Height = 0;
         int Width = 0;
+        int Height = 0;
+
+      public:
+        SizeValues() {}
+        SizeValues(int Width, int Height) : Width(Width), Height(Height) {}
     };
 
     struct SC_LITE_EXTERN Point {
         int X = 0;
         int Y = 0;
+
+      public:
+        Point() {}
+        Point(int X, int Y) : X(X), Y(Y) {}
     };
 
     struct SC_LITE_EXTERN MousePoint {
@@ -73,13 +81,7 @@ namespace Screen_Capture {
 
       public:
         Rect() {}
-        Rect(int X,
-             int Y,
-             int Width,
-             int Height
-             ): X(X), Y(Y), Width(Width), Height(Height) {
-
-        }
+        Rect(int X, int Y, int Width, int Height) : X(X), Y(Y), Width(Width), Height(Height) {}
         std::shared_ptr<Rect> operator&(const Rect &r) const noexcept
         {
             int l1 = X;
@@ -258,6 +260,10 @@ namespace Screen_Capture {
     SC_LITE_EXTERN std::shared_ptr<Window> Fullscreen(const SingleWindowRequest &windowRequest, int display, bool fullscreen);
     // Make window minimize
     SC_LITE_EXTERN std::shared_ptr<Window> Minimize(const SingleWindowRequest &windowRequest, bool minimize);
+    // Make window maximize
+    SC_LITE_EXTERN std::shared_ptr<Window> Maximize(const SingleWindowRequest &windowRequest, bool maximize);
+    // Make window minimize
+    SC_LITE_EXTERN std::shared_ptr<Window> Visible(const SingleWindowRequest &windowRequest, bool visible);
     // Set rectangle
     SC_LITE_EXTERN std::shared_ptr<Window> Rectangle(const SingleWindowRequest &windowRequest, const Point &position, const SizeValues &size);
     // Make window top most

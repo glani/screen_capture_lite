@@ -273,15 +273,27 @@ int main(int arch, char **argv)
 
     if (windows) {
         std::string reqApp("Geany");
-        auto fit = std::find_if(windows->begin(), windows->end(), [&](const SL::Screen_Capture::Window &elem) { return elem.ProcessName == reqApp; });
+        std::string reqAppLowcase("geany");
+        auto fit = std::find_if(windows->begin(), windows->end(), [&](const SL::Screen_Capture::Window &elem) {
+            return elem.ProcessName == reqApp
+                || elem.ProcessName == reqAppLowcase;
+        });
         if (fit != windows->end()) {
 
             SL::Screen_Capture::SingleWindowRequest req = SL::Screen_Capture::WindowToWindowRequest(*fit);
             //            SL::Screen_Capture::Fullscreen(req, -1, true);
             //            SL::Screen_Capture::Fullscreen(req, -1, false);
+//            SL::Screen_Capture::Visible(req, true);
             SL::Screen_Capture::Topmost(req);
             SL::Screen_Capture::Rectangle(req, {req.Position.X + 100, req.Position.Y + 100}, req.Size);
-            //            SL::Screen_Capture::Minimize(req, false);
+//            SL::Screen_Capture::Visible(req, false);
+//            SL::Screen_Capture::Visible(req, true);
+            SL::Screen_Capture::Minimize(req, true);
+            SL::Screen_Capture::Minimize(req, false);
+            SL::Screen_Capture::Maximize(req, true);
+            SL::Screen_Capture::Maximize(req, false);
+            SL::Screen_Capture::Fullscreen(req, -1, true);
+            SL::Screen_Capture::Fullscreen(req, -1, false);
             //            SL::Screen_Capture::Minimize(req, true);
         }
 

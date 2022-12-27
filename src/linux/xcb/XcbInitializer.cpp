@@ -1,7 +1,10 @@
 #include "XcbInitializer.h"
 #include "XcbAtom.h"
 #include <memory>
+#include <xcb/xcb.h>
+
 #include <stdio.h>
+#include <xcb/xcb_icccm.h>
 
 static const char *const xcbConnectionErrors[] = {
     "No error",                                  /* Error 0 */
@@ -59,11 +62,12 @@ void XcbInitializer::init()
 {
     Display *dpy = XOpenDisplay(NULL);
     if (dpy) {
-        primaryScreenNumberValue = DefaultScreen(dpy);
         XSetEventQueueOwner(dpy, XCBOwnsEventQueue);
         XSetErrorHandler(nullErrorHandler);
         XSetIOErrorHandler(ioErrorHandler);
         xlibDisplayValue = dpy;
+        rootWindowValue = XDefaultRootWindow(xlibDisplayValue);
+        primaryScreenNumberValue = DefaultScreen(dpy);
     }
     xcbConnectionValue = xcb_connect(NULL, NULL);
     setupValues = xcb_get_setup(xcbConnectionValue);
@@ -90,4 +94,123 @@ std::string XcbInitializer::atomName(xcb_atom_t atom)
     }
 
     return res;
+}
+
+void XcbInitializer::flush() { xcb_flush(xcbConnectionValue); }
+
+void XcbInitializer::rectangle(const xcb_window_t &win, const SL::Screen_Capture::Point &position, const SL::Screen_Capture::SizeValues &size)
+{
+    auto display = xlibDisplayValue;
+    uint32_t values[] = {static_cast<uint32_t>(position.X), static_cast<uint32_t>(position.Y), static_cast<uint32_t>(size.Width),
+                         static_cast<uint32_t>(size.Height)};
+    xcb_configure_window(xcbConnectionValue, win, XCB_CONFIG_WINDOW_X_Y_WIDTH_HEIGHT, values);
+}
+
+bool XcbInitializer::windowExists(const xcb_window_t &win) const
+{
+    xcb_generic_error_t *err;
+    free(xcb_query_tree_reply(xcbConnectionValue, xcb_query_tree(xcbConnectionValue, win), &err));
+
+    if (err != NULL) {
+        free(err);
+        return false;
+    }
+
+    return true;
+}
+void XcbInitializer::visible(const xcb_window_t &win, bool visible)
+{
+    uint32_t values_off[] = {ROOT_EVENT_MASK & ~XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY};
+    uint32_t values_on[] = {ROOT_EVENT_MASK};
+    xcb_change_window_attributes(xcbConnectionValue, rootWindow(), XCB_CW_EVENT_MASK, values_off);
+    if (visible) {
+        setWindowState(win, XCB_ICCCM_WM_STATE_ICONIC);
+        xcb_map_window(xcbConnectionValue, win);
+    }
+    else {
+        xcb_unmap_window(xcbConnectionValue, win);
+        setWindowState(win, XCB_ICCCM_WM_STATE_ICONIC);
+    }
+    xcb_change_window_attributes(xcbConnectionValue, rootWindow(), XCB_CW_EVENT_MASK, values_on);
+}
+
+void XcbInitializer::activate(const xcb_window_t &win)
+{
+    const static uint32_t values[] = {XCB_STACK_MODE_ABOVE};
+
+    /* Move the window on the top of the stack */
+    xcb_configure_window(xcbConnectionValue, win, XCB_CONFIG_WINDOW_STACK_MODE, values);
+    xcb_client_message_event_t event;
+
+    event.response_type = XCB_CLIENT_MESSAGE;
+    event.window = win;
+    event.type = atom(XcbAtom::Atom::_NET_ACTIVE_WINDOW);
+    event.format = 32;
+    event.data.data32[0] = 1;
+    event.data.data32[1] = XCB_CURRENT_TIME;
+    event.data.data32[2] = XCB_NONE;
+    event.data.data32[3] = 0;
+    event.data.data32[4] = 0;
+
+    xcb_send_event(xcbConnectionValue, false, rootWindowValue, XCB_EVENT_MASK_STRUCTURE_NOTIFY | XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT,
+                   (char *)&event);
+}
+
+void XcbInitializer::setWindowState(const xcb_window_t &win, uint32_t state)
+{
+    long data[] = {state, XCB_NONE};
+    const xcb_atom_t &wmState = atom(XcbAtom::WM_STATE);
+    xcb_change_property(xcbConnectionValue, XCB_PROP_MODE_REPLACE, win, wmState, wmState, 32, 2, data);
+}
+
+void XcbInitializer::maximize(const xcb_window_t &win, bool maximize)
+{
+    xcb_atom_t max_h = atom(XcbAtom::Atom::_NET_WM_STATE_MAXIMIZED_HORZ);
+    xcb_atom_t max_v = atom(XcbAtom::Atom::_NET_WM_STATE_MAXIMIZED_VERT);
+    xcb_atom_t state = atom(XcbAtom::Atom::_NET_WM_STATE);
+
+    xcb_client_message_event_t event;
+
+    event.response_type = XCB_CLIENT_MESSAGE;
+    event.window = win;
+    event.type = state;
+    event.format = 32;
+    event.data.data32[0] = maximize ? 1 : 0;
+    event.data.data32[1] = max_v;
+    event.data.data32[2] = max_h;
+    event.data.data32[3] = 1;
+    event.data.data32[4] = 0;
+    xcb_send_event(xcbConnectionValue, false, rootWindowValue, XCB_EVENT_MASK_STRUCTURE_NOTIFY | XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT,
+                   (char *)&event);
+}
+
+void XcbInitializer::minimize(const xcb_window_t &win, bool minimize)
+{
+    if (minimize) {
+        XIconifyWindow(xlibDisplay(), win, primaryScreenNumberValue);
+    } else {
+        visible(win, false);
+        visible(win, true);
+        XMapWindow(xlibDisplay(), win);
+    }
+}
+void XcbInitializer::fullscreen(const xcb_window_t &win, bool fullscreen) {
+    xcb_atom_t fs = atom(XcbAtom::Atom::_NET_WM_STATE_FULLSCREEN);
+    xcb_atom_t max_v = atom(XcbAtom::Atom::_NET_WM_STATE_MAXIMIZED_VERT);
+    xcb_atom_t state = atom(XcbAtom::Atom::_NET_WM_STATE);
+
+    xcb_client_message_event_t event;
+
+    event.response_type = XCB_CLIENT_MESSAGE;
+    event.window = win;
+    event.type = state;
+    event.format = 32;
+    event.data.data32[0] = fullscreen ? 1 : 0;
+    event.data.data32[1] = fs;
+    event.data.data32[2] = 0;
+    event.data.data32[3] = 1;
+    event.data.data32[4] = 0;
+    xcb_send_event(xcbConnectionValue, false, rootWindowValue, XCB_EVENT_MASK_STRUCTURE_NOTIFY | XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT,
+                   (char *)&event);
+
 }
