@@ -193,6 +193,8 @@ namespace SL {
             ret.OriginalOffsetY = ret.OffsetY = oy;
             ret.OriginalWidth = ret.Width = w;
             ret.OriginalHeight = ret.Height = h;
+            ret.Frame = Rect(ox, oy, w, h);
+            ret.VisibleFrame = Rect(ox, oy, w, h);
             ret.Scaling = scaling;
             return ret;
         }
@@ -239,7 +241,7 @@ namespace SL {
         int Width(const Image &img) { return Width(img.Bounds); }
         int X(const Point &p) { return p.X; }
         int Y(const Point &p) { return p.Y; }
-        const ImageRect &Rect(const Image &img) { return img.Bounds; } 
+        const ImageRect &DetermineRectValue(const Image &img) { return img.Bounds; }
         const ImageBGRA *GotoNextRow(const Image &img, const ImageBGRA* current) {
             auto c = reinterpret_cast<const unsigned char*>(current); 
             return reinterpret_cast<const ImageBGRA*>(c + img.BytesToNextRow);

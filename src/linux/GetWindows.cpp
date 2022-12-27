@@ -1,5 +1,7 @@
 #include "ScreenCapture.h"
 #include "internal/SCShared.h"
+#include "xcb/XcbAtom.h"
+#include "xcb/XcbInitializer.h"
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
@@ -8,6 +10,8 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <xcb/xcb.h>
+
 
 #define LODEPNG_COMPILE_PNG
 #define LODEPNG_COMPILE_DISK
@@ -18,8 +22,6 @@
 using namespace std::string_literals;
 
 #define _REQUEST_ICON_SIZE 256
-#define _DEFAULT_ICON_SIZE 32
-#define _DEFAULT_MINI_ICON_SIZE 16
 
 namespace {
 class UniqueTextProperty {
@@ -99,7 +101,7 @@ namespace Screen_Capture {
         bool retrieveIcon;
         std::map<std::string, std::string> icons;
     };
-    std::shared_ptr<std::vector<Window>> getWindows(const std::string &netRequestedAtom, bool retrieveIcon, RetrieveWindowsConstraint retrieve);
+    std::shared_ptr<std::vector<Window>> getWindows(const std::string &netRequestedAtom, bool retrieveIcon, const RetrieveWindowsConstraint& retrieve);
     void addWindow(Display *display, XID &window, struct _WindowRequest wr, std::vector<Window> &wnd);
     pid_t determinePid(Display *display, XID &window, Atom &atomPID);
     int getExeForPid(pid_t pid, char *buf, size_t sz);
@@ -114,7 +116,8 @@ namespace Screen_Capture {
 
     std::shared_ptr<Window> GetWindow(const SingleWindowRequest &request)
     {
-        auto res = getWindows(std::string("_NET_CLIENT_LIST"), request.RetrieveIcons, [&](const XID &id) { return reinterpret_cast<XID>(request.Handle) == id; });
+        auto res = getWindows(std::string("_NET_CLIENT_LIST"), request.RetrieveIcons,
+                              [&](const XID &id) { return reinterpret_cast<XID>(request.Handle) == id; });
         if (!res->empty()) {
             return std::make_shared<Window>(res->front());
         }
@@ -167,17 +170,19 @@ namespace Screen_Capture {
         return res;
     }
 
-    std::shared_ptr<std::vector<Window>> getWindows(const std::string &netRequestedAtom, bool retrieveIcon, RetrieveWindowsConstraint retrieve)
+    std::shared_ptr<std::vector<Window>> getWindows(const std::string &netRequestedAtom, bool retrieveIcon, const RetrieveWindowsConstraint& retrieve)
     {
         std::shared_ptr<std::vector<Window>> result = std::make_shared<std::vector<Window>>();
 
-        auto *display = XOpenDisplay(NULL);
+        auto &xcbInstance = XcbInitializer::getInstance();
+        auto display = xcbInstance.xlibDisplay();
 
         struct _WindowRequest wr;
-        wr.atomPID = XInternAtom(display, "_NET_WM_PID", True);
+
+        wr.atomPID = xcbInstance.atom(XcbAtom::_NET_WM_PID);
         wr.retrieveIcon = retrieveIcon;
 
-        Atom atomWindowsRequested = XInternAtom(display, netRequestedAtom.c_str(), true);
+        Atom atomWindowsRequested = xcbInstance.internAtom(netRequestedAtom.c_str());
         Atom actualType;
         int format;
         unsigned long numItems, bytesAfter;
@@ -194,7 +199,6 @@ namespace Screen_Capture {
             }
             XFree(data);
         }
-        XCloseDisplay(display);
         return result;
     }
 
@@ -202,7 +206,8 @@ namespace Screen_Capture {
 
     void addWindow(Display *display, XID &window, struct _WindowRequest wr, std::vector<Window> &wnd)
     {
-
+        auto &xcbInstance = XcbInitializer::getInstance();
+        Screen *screen = XDefaultScreenOfDisplay(display);
         pid_t ownerPid = 0;
         std::string exec;
         if (wr.atomPID != None) {
@@ -227,6 +232,9 @@ namespace Screen_Capture {
             XWindowAttributes wndattr;
             XGetWindowAttributes(display, window, &wndattr);
 
+            int xp = 0;
+            int yp = 0;
+            getWindowPosition(wndattr.screen, window, &xp, &yp);
             int leftFrame = 0;
             int rightFrame = 0;
             int topFrame = 0;
@@ -235,11 +243,7 @@ namespace Screen_Capture {
             if (frameExternal) {
             }
 
-            int xp = 0;
-            int yp = 0;
-            getWindowPosition(wndattr.screen, window, &xp, &yp);
-
-            w.Position = Point{wndattr.x, wndattr.y};
+            w.Position = Point{xp, yp};
             w.Size = SizeValues{wndattr.width, wndattr.height};
             w.Name = name;
 
@@ -265,6 +269,13 @@ namespace Screen_Capture {
                 attributeExec.Code = std::string(S_RES_START_ABSOLUTE_URL);
                 attributeExec.Value = exec;
                 w.Attributes.emplace_back(attributeExec);
+            }
+
+            auto desktop = XCB_REPLY_UNCHECKED(xcb_get_property, xcbInstance.xcbConnection(), false, window,
+                                                xcbInstance.atom(XcbAtom::_NET_WM_DESKTOP), XCB_ATOM_CARDINAL, 0, 1024);
+            if (desktop && desktop->type == XCB_ATOM_CARDINAL && desktop->format == 32 && desktop->value_len) {
+                uint32_t *desktopValue = (uint32_t *)xcb_get_property_value(desktop.get());
+                w.WorkSpace = static_cast<size_t>(*desktopValue);
             }
 
             Atom atomWmState = XInternAtom(display, "_NET_WM_STATE", true);
@@ -560,6 +571,19 @@ namespace Screen_Capture {
                 *right_frame = -p_size[1];
                 *top_frame = -p_size[2];
                 *bottom_frame = -p_size[3];
+
+                retval = true;
+            }
+        }
+        if (p_size == NULL) {
+            Atom atomGtkFrameExtents = XInternAtom(display, "_KDE_NET_WM_FRAME_STRUT", true);
+            getCardinalList(display, window, atomGtkFrameExtents, &p_size, &n_size);
+
+            if (p_size != NULL && n_size == 4) {
+                *left_frame = p_size[0];
+                *right_frame = p_size[1];
+                *top_frame = p_size[2];
+                *bottom_frame = p_size[3];
 
                 retval = true;
             }

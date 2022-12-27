@@ -92,12 +92,15 @@ else ()
             src/linux/X11FrameProcessorSync.cpp
             src/linux/X11FrameProcessor.cpp
             src/linux/GetMonitors.cpp
+            src/linux/Init.cpp
             src/linux/png/lodepng.cpp
             src/linux/png/lodepng.h
             src/linux/base64/base64.cpp
             src/linux/base64/base64.h
-
-
+            src/linux/xcb/XcbInitializer.cpp
+            src/linux/xcb/XcbInitializer.h
+            src/linux/xcb/XcbAtom.cpp
+            src/linux/xcb/XcbAtom.h
             src/linux/ThreadRunner.cpp
             src/linux/SyncRunner.cpp
             src/linux/base64/base64.cpp src/linux/base64/base64.h)
@@ -108,10 +111,14 @@ else ()
     if (!X11_Xfixes_LIB)
         message(FATAL_ERROR "X11 fixes extension is required, but not found!")
     endif ()
-    # TODO switch to require #    pkg_check_modules(WNCK REQUIRED libwnck-3.0)
-    # does not work
-    # pkg_check_modules(WNCK libwnck-3.0)
-    message(STATUS "dfdasasdasd" ${WNCK_FOUND})
+
+    if (!X11_xcb_FOUND)
+        message(FATAL_ERROR "X11 xcb extensions are required, but not found!")
+    endif ()
+    if (!X11_xcb_LIB)
+        message(FATAL_ERROR "X11 xcb is required, but not found!")
+    endif ()
+
     if (NOT DEFINED WNCK_FOUND OR TRUE)
         list(APPEND SCREEN_CAPTURE_PLATFORM_SRC
             src/linux/GetWindows.cpp
@@ -132,6 +139,8 @@ else ()
     set(SCREEN_CAPTURE_PLATFORM_INC
             include/linux
             ${X11_INCLUDE_DIR}
+            ${X11_xcb_INCLUDE_PATH}
+            ${X11_XCB_XINERAMA_INCLUDE_PATH}
             ${WNCK_INCLUDE_DIRS}
             )
 

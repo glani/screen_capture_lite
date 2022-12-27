@@ -259,9 +259,18 @@ void createwindowgrabber()
 }
 int main(int arch, char **argv)
 {
+    SL::Screen_Capture::Init();
+    SL::Screen_Capture::SearchAllWindowsRequest gar;
+    gar.RetrieveIcons = true;
+    auto activeWindow = SL::Screen_Capture::GetActiveWindow(gar);
+
     SL::Screen_Capture::SearchAllWindowsRequest request;
     request.RetrieveIcons = true;
+
+    std::shared_ptr<std::vector<SL::Screen_Capture::Monitor>> monitors = SL::Screen_Capture::GetMonitors();
+
     std::shared_ptr<std::vector<SL::Screen_Capture::Window>> windows = SL::Screen_Capture::GetWindows(request);
+
     if (windows) {
         std::string reqApp("Geany");
         auto fit = std::find_if(windows->begin(), windows->end(), [&](const SL::Screen_Capture::Window &elem) { return elem.ProcessName == reqApp; });
@@ -287,24 +296,13 @@ int main(int arch, char **argv)
             }
         }
     }
-    //    windows = SL::Screen_Capture::GetWindows();
-    //    windows = SL::Screen_Capture::GetWindows();
-    //    windows = SL::Screen_Capture::GetWindows();
-    //    windows = SL::Screen_Capture::GetWindows();
-    //    windows = SL::Screen_Capture::GetWindows();
-    //    windows = SL::Screen_Capture::GetWindows();
+    request.RetrieveIcons = false;
+    gar.RetrieveIcons = false;
+    for (int i =0; i < 100; i++) {
+        windows = SL::Screen_Capture::GetWindows(request);
 
-    SL::Screen_Capture::SearchAllWindowsRequest gar;
-    gar.RetrieveIcons = true;
-    auto activeWindow = SL::Screen_Capture::GetActiveWindow(gar);
-
-    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
-    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
-    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
-    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
-    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
-    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
-    //    activeWindow = SL::Screen_Capture::GetActiveWindow();
+        activeWindow = SL::Screen_Capture::GetActiveWindow(gar);
+    }
 
     // #ifndef WINDOWS
     //     while (true) {

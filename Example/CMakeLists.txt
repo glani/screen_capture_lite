@@ -37,10 +37,14 @@ else()
  		message(FATAL_ERROR "X11 fixes extension is required, but not found!")
 	endif()
 	find_package(Threads REQUIRED)
+#	message(FATAL_ERROR "X11 fixes extension is required, but not found!" ${X11_xcb_LIB})
 	set(${PROJECT_NAME}_PLATFORM_LIBS
 		${X11_LIBRARIES}
 		${X11_Xfixes_LIB}
 		${X11_XTest_LIB}
+		${X11_xcb_LIB}
+		xcb-xinerama
+		X11-xcb
 		${X11_Xinerama_LIB}
 		${WNCK_LIBRARIES}
 		${CMAKE_THREAD_LIBS_INIT}

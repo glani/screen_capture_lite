@@ -47,6 +47,7 @@ namespace Screen_Capture {
         SizeValues Size;
         std::string Name;
         std::string ProcessName;
+        size_t WorkSpace;
         std::vector<WindowAttribute> Attributes;
     };
 
@@ -69,6 +70,61 @@ namespace Screen_Capture {
         int Y = 0;
         int Height = 0;
         int Width = 0;
+
+      public:
+        Rect() {}
+        Rect(int X,
+             int Y,
+             int Width,
+             int Height
+             ): X(X), Y(Y), Width(Width), Height(Height) {
+
+        }
+        std::shared_ptr<Rect> operator&(const Rect &r) const noexcept
+        {
+            int l1 = X;
+            int r1 = X;
+            if (Width < 0)
+                l1 += Width;
+            else
+                r1 += Width;
+            if (l1 == r1) // null rect
+                return NULL;
+            int l2 = r.X;
+            int r2 = r.X;
+            if (r.Width < 0)
+                l2 += r.Width;
+            else
+                r2 += r.Width;
+            if (l2 == r2) // null rect
+                return NULL;
+            if (l1 >= r2 || l2 >= r1)
+                return NULL;
+            int t1 = Y;
+            int b1 = Y;
+            if (Height < 0)
+                t1 += Height;
+            else
+                b1 += Height;
+            if (t1 == b1) // null rect
+                return NULL;
+            int t2 = r.Y;
+            int b2 = r.Y;
+            if (r.Height < 0)
+                t2 += r.Height;
+            else
+                b2 += r.Height;
+            if (t2 == b2) // null rect
+                return NULL;
+            if (t1 >= b2 || t2 >= b1)
+                return NULL;
+            Rect tmp;
+            tmp.X = std::max(l1, l2);
+            tmp.Y = std::max(t1, t2);
+            tmp.Width = std::min(r1, r2) - tmp.X;
+            tmp.Height = std::min(b1, b2) - tmp.Y;
+            return std::make_shared<Rect>(tmp);
+        }
     };
 
     struct SC_LITE_EXTERN Monitor {
@@ -164,12 +220,11 @@ namespace Screen_Capture {
         windowRequest.OwnerHandle = window.OwnerHandle;
         windowRequest.Position = window.Position;
         windowRequest.Size = window.Size;
-//        windowRequest.Minimized = window.Minimized;
-//        windowRequest.Fullscreen = window.Fullscreen;
+        //        windowRequest.Minimized = window.Minimized;
+        //        windowRequest.Fullscreen = window.Fullscreen;
 
         return windowRequest;
     }
-
 
     class Timer {
         using Clock =
@@ -197,22 +252,24 @@ namespace Screen_Capture {
     // will return all attached monitors
     SC_LITE_EXTERN std::shared_ptr<std::vector<Monitor>> GetMonitors();
     // will return all windows
-    SC_LITE_EXTERN std::shared_ptr<std::vector<Window>> GetWindows(const SearchAllWindowsRequest & request);
+    SC_LITE_EXTERN std::shared_ptr<std::vector<Window>> GetWindows(const SearchAllWindowsRequest &request);
 
     // Make window full screen
-    SC_LITE_EXTERN std::shared_ptr<Window> Fullscreen(const SingleWindowRequest & windowRequest, int display, bool fullscreen);
+    SC_LITE_EXTERN std::shared_ptr<Window> Fullscreen(const SingleWindowRequest &windowRequest, int display, bool fullscreen);
     // Make window minimize
-    SC_LITE_EXTERN std::shared_ptr<Window> Minimize(const SingleWindowRequest & windowRequest, bool minimize);
+    SC_LITE_EXTERN std::shared_ptr<Window> Minimize(const SingleWindowRequest &windowRequest, bool minimize);
     // Set rectangle
-    SC_LITE_EXTERN std::shared_ptr<Window> Rectangle(const SingleWindowRequest & windowRequest, const Point& position, const SizeValues& size);
+    SC_LITE_EXTERN std::shared_ptr<Window> Rectangle(const SingleWindowRequest &windowRequest, const Point &position, const SizeValues &size);
     // Make window top most
-    SC_LITE_EXTERN std::shared_ptr<Window> Topmost(const SingleWindowRequest & windowRequest);
+    SC_LITE_EXTERN std::shared_ptr<Window> Topmost(const SingleWindowRequest &windowRequest);
     // will return active window
-    SC_LITE_EXTERN std::shared_ptr<Window> GetActiveWindow(const SearchAllWindowsRequest & request);
+    SC_LITE_EXTERN std::shared_ptr<Window> GetActiveWindow(const SearchAllWindowsRequest &request);
     // will return requested window
-    SC_LITE_EXTERN std::shared_ptr<Window> GetWindow(const SingleWindowRequest & request);
+    SC_LITE_EXTERN std::shared_ptr<Window> GetWindow(const SingleWindowRequest &request);
     // request accessibility permissions
     SC_LITE_EXTERN bool RequestAccessibilityPermissions();
+    // init
+    SC_LITE_EXTERN void Init();
 
     typedef std::function<void(const SL::Screen_Capture::Image &img, const Window &window)> WindowCaptureCallback;
     typedef std::function<void(const SL::Screen_Capture::Image &img, const Monitor &monitor)> ScreenCaptureCallback;
@@ -267,12 +324,12 @@ namespace Screen_Capture {
     SC_LITE_EXTERN std::shared_ptr<ICaptureConfiguration<WindowCaptureCallback>> CreateCaptureConfiguration(const WindowCallback &windowstocapture);
 
     class SC_LITE_EXTERN IScreenCaptureManagerSync {
-    public:
+      public:
         virtual ~IScreenCaptureManagerSync() {}
     };
 
     template <typename CAPTURECALLBACK> class ICaptureConfigurationSync {
-    public:
+      public:
         virtual ~ICaptureConfigurationSync() {}
         // When a new Frame is available the callback is invoked
         virtual std::shared_ptr<ICaptureConfigurationSync<CAPTURECALLBACK>> onNewFrame(const CAPTURECALLBACK &cb) = 0;
@@ -284,7 +341,8 @@ namespace Screen_Capture {
 
     // the callback of windowstocapture represents the list of monitors which should be captured. Users should return the list of monitors they want
     // to be captured
-    SC_LITE_EXTERN std::shared_ptr<ICaptureConfigurationSync<ScreenCaptureCallback>> CreateCaptureConfigurationSync(const MonitorCallback &monitorstocapture);
+    SC_LITE_EXTERN std::shared_ptr<ICaptureConfigurationSync<ScreenCaptureCallback>>
+    CreateCaptureConfigurationSync(const MonitorCallback &monitorstocapture);
     SC_LITE_EXTERN bool RequestPermissionsSync();
 
 } // namespace Screen_Capture
