@@ -1,9 +1,8 @@
 #include "xcb/XcbInitializer.h"
-// init
 
 namespace SL {
 namespace Screen_Capture {
-    void Init()
+    void InitWindows()
     {
         auto &xcbInstance = XcbInitializer::getInstance();
         xcbInstance.init();

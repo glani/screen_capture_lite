@@ -114,10 +114,9 @@ namespace Screen_Capture {
     bool findBestSize(unsigned long *data, unsigned long nitems, int ideal_size, int *width, int *height, unsigned long **start);
     bool readRgbIcon(Display *display, XID &window, int *width, int *height, std::string &icon);
 
-    std::shared_ptr<Window> GetWindow(const SingleWindowRequest &request)
+    std::shared_ptr<Window> GetActiveWindow(const SharedWindowsRequest &request)
     {
-        auto res = getWindows(std::string("_NET_CLIENT_LIST"), request.RetrieveIcons,
-                              [&](const XID &id) { return reinterpret_cast<XID>(request.Handle) == id; });
+        auto res = getWindows(std::string("_NET_ACTIVE_WINDOW"), request.RetrieveIcons, [&](const XID &id) { return true; });
         if (!res->empty()) {
             return std::make_shared<Window>(res->front());
         }
@@ -126,9 +125,10 @@ namespace Screen_Capture {
         }
     }
 
-    std::shared_ptr<Window> GetActiveWindow(const SearchAllWindowsRequest &request)
+    std::shared_ptr<Window> GetWindow(const SingleWindowRequest &request)
     {
-        auto res = getWindows(std::string("_NET_ACTIVE_WINDOW"), request.RetrieveIcons, [&](const XID &id) { return true; });
+        auto res = getWindows(std::string("_NET_CLIENT_LIST"), request.RetrieveIcons,
+                              [&](const XID &id) { return reinterpret_cast<XID>(request.Handle) == id; });
         if (!res->empty()) {
             return std::make_shared<Window>(res->front());
         }
@@ -155,20 +155,7 @@ namespace Screen_Capture {
             XID window = static_cast<XID>(windowRequest.Handle);
             addWindow(xcbInstance.xlibDisplay(), window, wr, [&](const Window &wnd) { res = std::make_shared<Window>(wnd); });
         }
-
         return res;
-    }
-
-    std::shared_ptr<ShowingDesktopResult> ShowingDesktop(bool show) {
-        std::shared_ptr<ShowingDesktopResult> res = std::make_shared<ShowingDesktopResult>();
-        auto &xcbInstance = XcbInitializer::getInstance();
-        if (xcbInstance.showingDesktop(show)) {
-            // TODO think
-        }
-        xcbInstance.flush();
-
-        return res;
-
     }
 
     // Make window minimize
@@ -260,6 +247,22 @@ namespace Screen_Capture {
         return res;
     }
 
+    std::shared_ptr<ShowingDesktopResult> ShowingDesktop(bool show)
+    {
+        std::shared_ptr<ShowingDesktopResult> res = std::make_shared<ShowingDesktopResult>();
+        auto &xcbInstance = XcbInitializer::getInstance();
+        if (xcbInstance.showingDesktop(show)) {
+            // TODO think
+        }
+        xcbInstance.flush();
+
+        return res;
+    }
+
+    bool RequestAccessibilityPermissions() { return true; }
+
+    // helpers
+
     std::shared_ptr<std::vector<Window>> getWindows(const std::string &netRequestedAtom, bool retrieveIcon, const RetrieveWindowsConstraint &retrieve)
     {
         std::shared_ptr<std::vector<Window>> result = std::make_shared<std::vector<Window>>();
@@ -289,8 +292,6 @@ namespace Screen_Capture {
         }
         return result;
     }
-
-    bool RequestAccessibilityPermissions() { return true; }
 
     void addWindow(Display *display, XID &window, struct _WindowRequest wr, const AddWindowsCallback &callback)
     {

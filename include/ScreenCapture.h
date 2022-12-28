@@ -73,6 +73,10 @@ namespace Screen_Capture {
         bool RetrieveIcons;
     };
 
+    struct SC_LITE_EXTERN SharedWindowsRequest {
+        bool RetrieveIcons;
+    };
+
     struct SC_LITE_EXTERN Rect {
         int X = 0;
         int Y = 0;
@@ -274,13 +278,13 @@ namespace Screen_Capture {
     // Make window top most
     SC_LITE_EXTERN std::shared_ptr<Window> Topmost(const SingleWindowRequest &windowRequest);
     // will return active window
-    SC_LITE_EXTERN std::shared_ptr<Window> GetActiveWindow(const SearchAllWindowsRequest &request);
+    SC_LITE_EXTERN std::shared_ptr<Window> GetActiveWindow(const SharedWindowsRequest &request);
     // will return requested window
     SC_LITE_EXTERN std::shared_ptr<Window> GetWindow(const SingleWindowRequest &request);
     // request accessibility permissions
     SC_LITE_EXTERN bool RequestAccessibilityPermissions();
-    // init
-    SC_LITE_EXTERN void Init();
+    // InitWindows
+    SC_LITE_EXTERN void InitWindows();
 
     typedef std::function<void(const SL::Screen_Capture::Image &img, const Window &window)> WindowCaptureCallback;
     typedef std::function<void(const SL::Screen_Capture::Image &img, const Monitor &monitor)> ScreenCaptureCallback;

@@ -72,6 +72,7 @@ namespace Screen_Capture {
             auto name = std::string("Display ") + std::to_string(i);
             Monitor monitor = CreateMonitor(i, queryScreens[i].screen_number, queryScreens[i].height, queryScreens[i].width, queryScreens[i].x_org,
                                             queryScreens[i].y_org, name, 1.0f);
+            monitor.Main = i == 0;
             if (wmWorkspace == GTK) {
                 // try to apply based on intersection
                 auto fit = std::find_if(workspaces.begin(), workspaces.end(), [&](const Rect &rect) {

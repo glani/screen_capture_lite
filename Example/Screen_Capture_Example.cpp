@@ -259,13 +259,13 @@ void createwindowgrabber()
 }
 int main(int arch, char **argv)
 {
-    SL::Screen_Capture::Init();
-    SL::Screen_Capture::SearchAllWindowsRequest gar;
+    SL::Screen_Capture::InitWindows();
+    SL::Screen_Capture::SharedWindowsRequest gar;
     gar.RetrieveIcons = true;
     auto activeWindow = SL::Screen_Capture::GetActiveWindow(gar);
 
     auto showingDesktopTrue = SL::Screen_Capture::ShowingDesktop(true);
-    auto showingDesktopFalse = SL::Screen_Capture::ShowingDesktop(false);
+//    auto showingDesktopFalse = SL::Screen_Capture::ShowingDesktop(false);
 
     SL::Screen_Capture::SearchAllWindowsRequest request;
     request.RetrieveIcons = true;
