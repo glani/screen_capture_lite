@@ -196,7 +196,6 @@ void XcbInitializer::minimize(const xcb_window_t &win, bool minimize)
 }
 void XcbInitializer::fullscreen(const xcb_window_t &win, bool fullscreen) {
     xcb_atom_t fs = atom(XcbAtom::Atom::_NET_WM_STATE_FULLSCREEN);
-    xcb_atom_t max_v = atom(XcbAtom::Atom::_NET_WM_STATE_MAXIMIZED_VERT);
     xcb_atom_t state = atom(XcbAtom::Atom::_NET_WM_STATE);
 
     xcb_client_message_event_t event;
@@ -213,4 +212,22 @@ void XcbInitializer::fullscreen(const xcb_window_t &win, bool fullscreen) {
     xcb_send_event(xcbConnectionValue, false, rootWindowValue, XCB_EVENT_MASK_STRUCTURE_NOTIFY | XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT,
                    (char *)&event);
 
+}
+bool XcbInitializer::showingDesktop(bool show) {
+    xcb_atom_t sd = internAtom("_NET_SHOWING_DESKTOP");
+
+    xcb_client_message_event_t event;
+
+    event.response_type = XCB_CLIENT_MESSAGE;
+    event.window = DefaultRootWindow(xlibDisplayValue);
+    event.type = sd;
+    event.format = 32;
+    event.data.data32[0] = show ? 1 : 0;
+    event.data.data32[1] = 0;
+    event.data.data32[2] = 0;
+    event.data.data32[3] = 0;
+    event.data.data32[4] = 0;
+    xcb_send_event(xcbConnectionValue, false, rootWindowValue, XCB_EVENT_MASK_STRUCTURE_NOTIFY | XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT,
+                   (char *)&event);
+    return false;
 }

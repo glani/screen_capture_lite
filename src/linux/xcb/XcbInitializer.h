@@ -75,6 +75,8 @@ class XcbInitializer {
 
     void fullscreen(const xcb_window_t &win, bool fullscreen);
 
+    bool showingDesktop(bool show);
+
   private:
     int primaryScreenNumberValue = -1;
     Display *xlibDisplayValue = nullptr;

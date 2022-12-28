@@ -264,6 +264,9 @@ int main(int arch, char **argv)
     gar.RetrieveIcons = true;
     auto activeWindow = SL::Screen_Capture::GetActiveWindow(gar);
 
+    auto showingDesktopTrue = SL::Screen_Capture::ShowingDesktop(true);
+    auto showingDesktopFalse = SL::Screen_Capture::ShowingDesktop(false);
+
     SL::Screen_Capture::SearchAllWindowsRequest request;
     request.RetrieveIcons = true;
 
@@ -284,7 +287,7 @@ int main(int arch, char **argv)
             //            SL::Screen_Capture::Fullscreen(req, -1, true);
             //            SL::Screen_Capture::Fullscreen(req, -1, false);
 //            SL::Screen_Capture::Visible(req, true);
-            SL::Screen_Capture::Topmost(req);
+           SL::Screen_Capture::Topmost(req);
             SL::Screen_Capture::Rectangle(req, {req.Position.X + 100, req.Position.Y + 100}, req.Size);
 //            SL::Screen_Capture::Visible(req, false);
 //            SL::Screen_Capture::Visible(req, true);

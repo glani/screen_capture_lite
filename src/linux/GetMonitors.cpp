@@ -12,15 +12,13 @@ namespace SL {
 namespace Screen_Capture {
     enum WMWorkspace { COMMON, GTK };
 
+
     std::shared_ptr<std::vector<Monitor>> GetMonitors()
     {
         std::shared_ptr<std::vector<Monitor>> ret = std::make_shared<std::vector<Monitor>>();
 
         auto &xcbInstance = XcbInitializer::getInstance();
         auto display = xcbInstance.xlibDisplay();
-        if (display == NULL) {
-            return ret;
-        }
         int nmonitors = 0;
         XineramaScreenInfo *queryScreens = XineramaQueryScreens(display, &nmonitors);
         if (queryScreens == NULL) {

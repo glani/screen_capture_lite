@@ -129,6 +129,9 @@ namespace Screen_Capture {
         }
     };
 
+    struct SC_LITE_EXTERN ShowingDesktopResult {
+    };
+
     struct SC_LITE_EXTERN Monitor {
         int Id = INT32_MAX;
         int Index = INT32_MAX;
@@ -251,6 +254,8 @@ namespace Screen_Capture {
         }
         std::chrono::microseconds duration() const { return Duration; }
     };
+    // showing desktop
+    SC_LITE_EXTERN std::shared_ptr<ShowingDesktopResult> ShowingDesktop(bool show);
     // will return all attached monitors
     SC_LITE_EXTERN std::shared_ptr<std::vector<Monitor>> GetMonitors();
     // will return all windows

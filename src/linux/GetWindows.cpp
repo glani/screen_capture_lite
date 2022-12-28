@@ -139,7 +139,7 @@ namespace Screen_Capture {
 
     std::shared_ptr<std::vector<Window>> GetWindows(const SearchAllWindowsRequest &request)
     {
-        return getWindows(std::string("_NET_CLIENT_LIST"), request.RetrieveIcons, [&](const XID &id) { return true; });
+        return getWindows(std::string("_NET_CLIENT_LIST_STACKING"), request.RetrieveIcons, [&](const XID &id) { return true; });
     }
 
     // Make window full screen
@@ -157,6 +157,18 @@ namespace Screen_Capture {
         }
 
         return res;
+    }
+
+    std::shared_ptr<ShowingDesktopResult> ShowingDesktop(bool show) {
+        std::shared_ptr<ShowingDesktopResult> res = std::make_shared<ShowingDesktopResult>();
+        auto &xcbInstance = XcbInitializer::getInstance();
+        if (xcbInstance.showingDesktop(show)) {
+            // TODO think
+        }
+        xcbInstance.flush();
+
+        return res;
+
     }
 
     // Make window minimize
