@@ -11,7 +11,7 @@ namespace SL {
 
         std::shared_ptr<Window> getWindow(const WindowData *window);
 
-        std::shared_ptr<WindowDataRequest> windowDataRequest(const SingleWindowRequest &SingleWindowRequest);
+        std::shared_ptr<WindowDataRequest> windowDataRequest(const SingleWindowRequest &singleWindowRequest);
 
         bool RequestAccessibilityPermissions() { return ptrWrapper.requestAccessibilityPermissions(); }
 
@@ -35,14 +35,12 @@ namespace SL {
 
         std::shared_ptr<Window> GetWindow(const SingleWindowRequest &windowRequests) {
             std::shared_ptr<Window> windowPtr;
-            // TODO
-//            std::shared_ptr<WindowData> window = ptrWrapper.topMost(*windowDataRequest(windowRequests));
-//            if (window) {
-//                windowPtr = getWindow(window.get());
-//            }
+            std::shared_ptr<WindowData> window = ptrWrapper.getWindow(*windowDataRequest(windowRequests));
+            if (window) {
+                windowPtr = getWindow(window.get());
+            }
 
-//            return windowPtr;
-            return nullptr;
+            return windowPtr;
 
         }
 
@@ -114,9 +112,9 @@ namespace SL {
             return windowPtr;
         }
 
-        std::shared_ptr<Window> Minimize(const SingleWindowRequest &SingleWindowRequest, bool minimize) {
+        std::shared_ptr<Window> Minimize(const SingleWindowRequest &singleWindowRequest, bool minimize) {
             std::shared_ptr<Window> windowPtr;
-            std::shared_ptr<WindowData> window = ptrWrapper.minimize(*windowDataRequest(SingleWindowRequest), minimize);
+            std::shared_ptr<WindowData> window = ptrWrapper.minimize(*windowDataRequest(singleWindowRequest), minimize);
             if (window) {
                 windowPtr = getWindow(window.get());
             }
@@ -178,16 +176,16 @@ namespace SL {
         }
 
 
-        std::shared_ptr<WindowDataRequest> windowDataRequest(const SingleWindowRequest &SingleWindowRequest) {
+        std::shared_ptr<WindowDataRequest> windowDataRequest(const SingleWindowRequest &singleWindowRequest) {
             auto windowRequestPtr = std::make_shared<WindowDataRequest>((WindowDataRequest) {});
-            windowRequestPtr->num = SingleWindowRequest.Handle;
-            windowRequestPtr->pid = SingleWindowRequest.OwnerHandle;
+            windowRequestPtr->num = singleWindowRequest.Handle;
+            windowRequestPtr->pid = singleWindowRequest.OwnerHandle;
             windowRequestPtr->rect = {
-                    {static_cast<float>(SingleWindowRequest.Position.X), static_cast<float>(SingleWindowRequest.Position.Y)},
-                    {static_cast<float>(SingleWindowRequest.Size.Width), static_cast<float>(SingleWindowRequest.Size.Height)}
+                    {static_cast<float>(singleWindowRequest.Position.X), static_cast<float>(singleWindowRequest.Position.Y)},
+                    {static_cast<float>(singleWindowRequest.Size.Width), static_cast<float>(singleWindowRequest.Size.Height)}
             };
-            windowRequestPtr->minimized = SingleWindowRequest.Minimized;
-            windowRequestPtr->fullscreen = SingleWindowRequest.Fullscreen;
+            windowRequestPtr->minimized = singleWindowRequest.Minimized;
+            windowRequestPtr->fullscreen = singleWindowRequest.Fullscreen;
             return windowRequestPtr;
         }
 
