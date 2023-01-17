@@ -24,13 +24,19 @@ namespace SL {
         }
         // Make window maximize
         std::shared_ptr<Window> Maximize(const SingleWindowRequest &windowRequest, bool maximize) {
-            // TODO
+            // not supported
+            // should be calculated  as fake fullscreen
             return nullptr;
         }
         // Make window minimize
         std::shared_ptr<Window> Visible(const SingleWindowRequest &windowRequest, bool visible) {
-            // TODO
-            return nullptr;
+            std::shared_ptr<Window> windowPtr;
+            std::shared_ptr<WindowData> window = ptrWrapper.minimize(*windowDataRequest(windowRequest), visible);
+            if (window) {
+                windowPtr = getWindow(window.get());
+            }
+
+            return windowPtr;
         }
 
         std::shared_ptr<Window> GetWindow(const SingleWindowRequest &windowRequests) {
@@ -39,9 +45,7 @@ namespace SL {
             if (window) {
                 windowPtr = getWindow(window.get());
             }
-
             return windowPtr;
-
         }
 
         std::shared_ptr<Window> GetActiveWindow(const SharedWindowsRequest &request) {

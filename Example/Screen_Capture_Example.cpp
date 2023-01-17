@@ -287,6 +287,7 @@ int main(int arch, char **argv)
             //            SL::Screen_Capture::Fullscreen(req, -1, true);
             //            SL::Screen_Capture::Fullscreen(req, -1, false);
 //            SL::Screen_Capture::Visible(req, true);
+//           SL::Screen_Capture::Fullscreen(req, 0, true);
            SL::Screen_Capture::Topmost(req);
             SL::Screen_Capture::Rectangle(req, {req.Position.X + 100, req.Position.Y + 100}, req.Size);
 //            SL::Screen_Capture::Visible(req, false);
