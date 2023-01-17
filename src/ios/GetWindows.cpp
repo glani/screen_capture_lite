@@ -35,7 +35,7 @@ namespace SL {
 
         std::shared_ptr<Window> GetWindow(const SingleWindowRequest &windowRequests) {
             std::shared_ptr<Window> windowPtr;
-            std::shared_ptr<WindowData> window = ptrWrapper.getWindow(*windowDataRequest(windowRequests));
+            std::shared_ptr<WindowData> window; // = ptrWrapper.getWindow(*windowDataRequest(windowRequests));
             if (window) {
                 windowPtr = getWindow(window.get());
             }

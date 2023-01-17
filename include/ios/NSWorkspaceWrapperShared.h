@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <CoreGraphics/CGGeometry.h>
 
 namespace SL {
 namespace Screen_Capture {
