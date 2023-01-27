@@ -20,6 +20,19 @@
 
 namespace SL {
 namespace Screen_Capture {
+    struct SC_LITE_EXTERN FrameValues {
+        int LeftFrame = 0;
+        int RightFrame = 0;
+        int TopFrame = 0;
+        int BottomFrame = 0;
+
+      public:
+        FrameValues() {}
+        FrameValues(int LeftFrame, int RightFrame, int TopFrame, int BottomFrame)
+            : LeftFrame(LeftFrame), RightFrame(RightFrame), TopFrame(TopFrame), BottomFrame(BottomFrame)
+        {
+        }
+    };
     struct SC_LITE_EXTERN SizeValues {
         int Width = 0;
         int Height = 0;
@@ -52,6 +65,7 @@ namespace Screen_Capture {
         size_t Handle;
         size_t OwnerHandle;
         Point Position;
+        FrameValues Frame;
         SizeValues Size;
         std::string Name;
         std::string ProcessName;
@@ -133,8 +147,7 @@ namespace Screen_Capture {
         }
     };
 
-    struct SC_LITE_EXTERN ShowingDesktopResult {
-    };
+    struct SC_LITE_EXTERN ShowingDesktopResult {};
 
     struct SC_LITE_EXTERN Monitor {
         int Id = INT32_MAX;

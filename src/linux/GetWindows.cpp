@@ -327,9 +327,8 @@ namespace Screen_Capture {
             int rightFrame = 0;
             int topFrame = 0;
             int bottomFrame = 0;
-            bool frameExternal = getFrameExtents(display, window, &leftFrame, &rightFrame, &topFrame, &bottomFrame);
-            if (frameExternal) {
-            }
+            getFrameExtents(display, window, &leftFrame, &rightFrame, &topFrame, &bottomFrame);
+            w.Frame = FrameValues(leftFrame, rightFrame, topFrame, bottomFrame);
 
             w.Position = Point(xp, yp);
             w.Size = SizeValues(wndattr.width, wndattr.height);
