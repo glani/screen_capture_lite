@@ -12,6 +12,7 @@ extern const CFStringRef kWindowIconString = CFSTR("kWindowIconString");
 extern const CFStringRef kWindowLocalizedName = CFSTR("kWindowLocalizedName");
 extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
 
+
 @implementation NSWorkspaceWrapper
 - (void)Init
 {
@@ -87,6 +88,7 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
 {
     auto window = [[SCWindowData alloc] init];
     window.pid = pid;
+
     NSString *processTitle = [mainProcess getProcessTitle];
     if (processTitle) {
         window.processTitle = (CFStringRef)CFRetain((__bridge CFStringRef)processTitle);
@@ -254,6 +256,28 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
     }
     return res;
 }
+- (SCWindowData *)getWindow:(NSWindowDataRequest *)request
+{
+    SCWindowData *res = nil;
+    int pid = [request pid];
+    auto appElement = [SCAccessibilityElement createApplicationElement:pid];
+    if (appElement) {
+        SCAccessibilityElementWindows *windowsElement = [appElement retrieveAllWindows];
+        SCAccessibilityElement *windowRes = nil;
+        NSArray *windowsList = [windowsElement getWindowsList];
+        for (SCAccessibilityElement *window in windowsList) {
+            if ([window determineRequiredWindow:request:[windowsList count] == 1]) {
+                windowRes = window;
+                break;
+            }
+        }
+        if (windowRes) {
+            res = [self createWindowFromSCAccessibilityElement:pid:windowsElement:windowRes];
+        }
+        [windowsElement release];
+    }
+    return res;
+}
 @end
 
 namespace SL {
@@ -304,7 +328,10 @@ namespace Screen_Capture {
             auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
             std::shared_ptr<std::string> execute;
             if (application) {
-                std::shared_ptr<std::string> icon = retrieveIcon(application);
+                std::shared_ptr<std::string> icon;
+                if (windowRequest.retrieveIcon) {
+                    icon = retrieveIconFromApplication(application);
+                }
                 std::shared_ptr<std::string> execute = retrieveExecutableURL(application);
                 NSWindowDataRequest *windowDataRequest = createNSWindowDataRequest(windowRequest);
                 SCWindowData *window = [ptr minimizeWindow:windowDataRequest:minimize];
@@ -320,8 +347,7 @@ namespace Screen_Capture {
                     }
                 }
             }
-            std::shared_ptr<struct WindowData> empty;
-            return empty;
+            return nullptr;
         }
 
         std::shared_ptr<struct WindowData> fullscreenWindow(const WindowDataRequest &windowRequest, int display, bool fullscreen)
@@ -330,7 +356,10 @@ namespace Screen_Capture {
             auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
             std::shared_ptr<std::string> execute;
             if (application) {
-                std::shared_ptr<std::string> icon = retrieveIcon(application);
+                std::shared_ptr<std::string> icon;
+                if (windowRequest.retrieveIcon) {
+                    icon = retrieveIconFromApplication(application);
+                }
                 std::shared_ptr<std::string> execute = retrieveExecutableURL(application);
                 NSWindowDataRequest *windowDataRequest = createNSWindowDataRequest(windowRequest);
                 SCWindowData *window = [ptr fullscreenWindow:windowDataRequest:display:fullscreen];
@@ -346,8 +375,34 @@ namespace Screen_Capture {
                     }
                 }
             }
-            std::shared_ptr<struct WindowData> empty;
-            return empty;
+            return nullptr;
+        }
+
+        std::shared_ptr<struct WindowData> getWindow(const WindowDataRequest &windowRequest) {
+            int pid = windowRequest.pid;
+            auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
+            std::shared_ptr<std::string> execute;
+            if (application) {
+                std::shared_ptr<std::string> icon;
+                if (windowRequest.retrieveIcon) {
+                    icon = retrieveIconFromApplication(application);
+                }
+                std::shared_ptr<std::string> execute = retrieveExecutableURL(application);
+                NSWindowDataRequest *windowDataRequest = createNSWindowDataRequest(windowRequest);
+                SCWindowData *window = [ptr getWindow:windowDataRequest];
+                [windowDataRequest release];
+                if (window) {
+                    auto windows = [[NSMutableArray alloc] init];
+                    [windows addObject:window];
+                    std::shared_ptr<std::vector<struct WindowData>> data = std::make_shared<std::vector<struct WindowData>>();
+                    this->processWindows(windows, pid, data.get(), execute, icon);
+                    CFRelease(windows);
+                    if (!data->empty()) {
+                        return std::make_shared<struct WindowData>(data->at(0));
+                    }
+                }
+            }
+            return nullptr;
         }
 
         std::shared_ptr<struct WindowData> topMostWindow(const WindowDataRequest &windowRequest)
@@ -356,7 +411,10 @@ namespace Screen_Capture {
             auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
             std::shared_ptr<std::string> execute;
             if (application) {
-                std::shared_ptr<std::string> icon = retrieveIcon(application);
+                std::shared_ptr<std::string> icon;
+                if (windowRequest.retrieveIcon) {
+                    icon = retrieveIconFromApplication(application);
+                }
                 std::shared_ptr<std::string> execute = retrieveExecutableURL(application);
                 NSWindowDataRequest *windowDataRequest = createNSWindowDataRequest(windowRequest);
                 SCWindowData *window = [ptr topMostWindow:windowDataRequest];
@@ -373,8 +431,7 @@ namespace Screen_Capture {
                     }
                 }
             }
-            std::shared_ptr<struct WindowData> empty;
-            return empty;
+            return nullptr;
         }
 
         std::shared_ptr<struct WindowData> rectWindow(const WindowDataRequest &windowRequest, const CGRect &rect)
@@ -383,7 +440,10 @@ namespace Screen_Capture {
             auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
             std::shared_ptr<std::string> execute;
             if (application) {
-                std::shared_ptr<std::string> icon = retrieveIcon(application);
+                std::shared_ptr<std::string> icon;
+                if (windowRequest.retrieveIcon) {
+                    icon = retrieveIconFromApplication(application);
+                }
                 std::shared_ptr<std::string> execute = retrieveExecutableURL(application);
                 NSWindowDataRequest *windowDataRequest = createNSWindowDataRequest(windowRequest);
                 SCWindowData *window = [ptr setRectWindow:windowDataRequest:rect];
@@ -399,11 +459,10 @@ namespace Screen_Capture {
                     }
                 }
             }
-            std::shared_ptr<struct WindowData> empty;
-            return empty;
+            return nullptr;
         }
 
-        std::shared_ptr<std::vector<struct WindowData>> determineWindows()
+        std::shared_ptr<std::vector<struct WindowData>> determineWindows(bool retrieveIcon)
         {
             std::shared_ptr<std::vector<struct WindowData>> data = std::make_shared<std::vector<struct WindowData>>();
             NSArray *values = [ptr determineApplicationValues];
@@ -414,7 +473,9 @@ namespace Screen_Capture {
                 if (application) {
                     std::shared_ptr<std::string> execute;
                     std::shared_ptr<std::string> icon;
-                    icon = retrieveIcon(application);
+                    if (retrieveIcon) {
+                        icon = retrieveIconFromApplication(application);
+                    }
                     execute = retrieveExecutableURL(application);
                     NSArray *windows = [ptr determineWindowsByProcessId:pid];
                     this->processWindows(windows, pid, data.get(), execute, icon);
@@ -426,7 +487,7 @@ namespace Screen_Capture {
             return data;
         }
 
-        std::shared_ptr<std::vector<struct WindowData>> determineWindows(int pid)
+        std::shared_ptr<std::vector<struct WindowData>> determineWindows(int pid, bool retrieveIcon)
         {
             std::shared_ptr<std::vector<struct WindowData>> data = std::make_shared<std::vector<struct WindowData>>();
             NSArray *windows = [ptr determineWindowsByProcessId:pid];
@@ -434,7 +495,9 @@ namespace Screen_Capture {
             if (application) {
                 std::shared_ptr<std::string> execute;
                 std::shared_ptr<std::string> icon;
-                icon = retrieveIcon(application);
+                if (retrieveIcon) {
+                    icon = retrieveIconFromApplication(application);
+                }
                 execute = retrieveExecutableURL(application);
                 this->processWindows(windows, pid, data.get(), execute, icon);
             }
@@ -453,7 +516,7 @@ namespace Screen_Capture {
             return execute;
         }
 
-        std::shared_ptr<std::string> retrieveIcon(NSRunningApplication *application)
+        std::shared_ptr<std::string> retrieveIconFromApplication(NSRunningApplication *application)
         {
             std::shared_ptr<std::string> icon;
             auto image = [application icon];
@@ -477,7 +540,7 @@ namespace Screen_Capture {
             int i = 0;
             for (SCWindowData *window in windows) {
                 struct WindowData wd;
-                wd.num = i;
+                wd.handle = [window handle];
                 i++;
                 wd.pid = pid;
                 wd.rect = [window rect];
@@ -528,7 +591,7 @@ namespace Screen_Capture {
             auto res = [[NSWindowDataRequest alloc] init];
             [res setFullscreen:request.fullscreen];
             [res setMinimized:request.minimized];
-            [res setNum:request.num];
+            [res setHandle:request.handle];
             [res setPid:request.pid];
             [res setRect:request.rect];
             return res;
@@ -553,8 +616,8 @@ namespace Screen_Capture {
         return p->determineApplicationValues();
     }
 
-    std::shared_ptr<std::vector<struct WindowData>> determineWindowsWrap(NSWorkspaceWrapperImpl *p, int pid) { return p->determineWindows(pid); }
-    std::shared_ptr<std::vector<struct WindowData>> determineWindowsWrap(NSWorkspaceWrapperImpl *p) { return p->determineWindows(); }
+    std::shared_ptr<std::vector<struct WindowData>> determineWindowsWrap(NSWorkspaceWrapperImpl *p, int pid, bool retrieveIcon) { return p->determineWindows(pid, retrieveIcon); }
+    std::shared_ptr<std::vector<struct WindowData>> determineWindowsWrap(NSWorkspaceWrapperImpl *p, bool retrieveIcon) { return p->determineWindows(retrieveIcon); }
 
     std::shared_ptr<struct WindowData> minimizeWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest &windowRequest, bool minimize)
     {
@@ -575,6 +638,11 @@ namespace Screen_Capture {
     std::shared_ptr<struct WindowData> topMostWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest &windowRequest)
     {
         return p->topMostWindow(windowRequest);
+    }
+
+    std::shared_ptr<struct WindowData> getWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest &windowRequest)
+    {
+        return p->getWindow(windowRequest);
     }
 
     void releaseFrontmostApplicationWrap(NSWorkspaceWrapperImpl *p, CFDictionaryRef query) { p->releaseFrontmostApplication(query); }

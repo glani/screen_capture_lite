@@ -10,8 +10,8 @@ namespace Screen_Capture {
         int pid;
     };
     struct WindowData {
-        int num;
         int pid;
+        uint32_t handle;
         std::shared_ptr<std::string> processTitle;
         std::shared_ptr<std::string> title;
         CGRect rect;
@@ -34,9 +34,10 @@ namespace Screen_Capture {
     struct WindowDataRequest {
         CGRect rect;
         int pid;
-        int num;
+        int handle;
         bool minimized;
         bool fullscreen;
+        bool retrieveIcon;
     };
 } // namespace Screen_Capture
 } // namespace SL

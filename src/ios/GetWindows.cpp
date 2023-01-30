@@ -2,6 +2,7 @@
 #include "Utils.h"
 #include "internal/SCShared.h"
 #include "ios/NSWorkspaceWrapper.h"
+#include "NSMouseProcessor.h"
 #include <algorithm>
 
 namespace SL {
@@ -22,12 +23,14 @@ namespace SL {
             // TODO
             return nullptr;
         }
+
         // Make window maximize
         std::shared_ptr<Window> Maximize(const SingleWindowRequest &windowRequest, bool maximize) {
             // not supported
-            // should be calculated  as fake fullscreen
+            // should be calculated as a  fake fullscreen
             return nullptr;
         }
+
         // Make window minimize
         std::shared_ptr<Window> Visible(const SingleWindowRequest &windowRequest, bool visible) {
             std::shared_ptr<Window> windowPtr;
@@ -41,24 +44,23 @@ namespace SL {
 
         std::shared_ptr<Window> GetWindow(const SingleWindowRequest &windowRequests) {
             std::shared_ptr<Window> windowPtr;
-            std::shared_ptr<WindowData> window; // = ptrWrapper.getWindow(*windowDataRequest(windowRequests));
+            std::shared_ptr<WindowData> window = ptrWrapper.getWindow(*windowDataRequest(windowRequests));
             if (window) {
                 windowPtr = getWindow(window.get());
             }
             return windowPtr;
         }
 
+        int getTopmostProcess();
+
         std::shared_ptr<Window> GetActiveWindow(const SharedWindowsRequest &request) {
             std::shared_ptr<Window> windowPtr;
-            CFDictionaryRef dictTopMost = ptrWrapper.determineFrontmostApplication();
-            CFNumberRef topMostPIDRef = static_cast<CFNumberRef>(CFDictionaryGetValue(dictTopMost, kWindowPid));
-            if (topMostPIDRef == NULL) {
-                ptrWrapper.releaseFrontmostApplication(dictTopMost);
-                return windowPtr;
+            int topMostPid = getTopmostProcess();
+            if (topMostPid == 0) {
+                return nullptr;
             }
-            int topMostPid = 0;
-            CFNumberGetValue(topMostPIDRef, kCFNumberIntType, &topMostPid);
-            auto windows = ptrWrapper.determineWindows(topMostPid);
+
+            auto windows = ptrWrapper.determineWindows(topMostPid, request.RetrieveIcons);
             for (const auto window: *windows) {
                 if (window.main && *window.main) {
                     windowPtr = getWindow(&window);
@@ -66,17 +68,59 @@ namespace SL {
                 }
             }
 
-            ptrWrapper.releaseFrontmostApplication(dictTopMost);
             return windowPtr;
         }
 
         std::shared_ptr<std::vector<Window>> GetWindows(const SearchAllWindowsRequest &request) {
+            auto windows = ptrWrapper.determineWindows(request.RetrieveIcons);
+//            int option = kCGWindowListExcludeDesktopElements | kCGWindowListOptionOnScreenOnly;
+//            auto windowList = CGWindowListCopyWindowInfo(option, kCGNullWindowID);
+//            std::map<uint32_t, std::vector<uint32_t>> processToIndex;
+//            CFIndex numWindows = CFArrayGetCount(windowList);
+//            for (uint32_t i = 0; i < numWindows; i++) {
+//                auto dict = static_cast<CFDictionaryRef>(CFArrayGetValueAtIndex(windowList, i));
+//                if (dict != NULL) {
+//                    auto windowOwnerPID = static_cast<CFNumberRef>(CFDictionaryGetValue(dict, kCGWindowOwnerPID));
+//                    uint32_t windowPid;
+//
+//                    if (windowOwnerPID != NULL && CFNumberGetValue(windowOwnerPID, kCFNumberIntType, &windowPid)) {
+//                        auto ownerHandle = static_cast<size_t>( windowPid);
+//                        auto it = processToIndex.find(ownerHandle);
+//                        if (it == processToIndex.end()) {
+//                            auto iit = processToIndex.emplace(ownerHandle, std::vector<uint32_t>());
+//                            it = iit.first;
+//                        }
+//                        it->second.emplace_back(i);
+//                    }
+//                }
+//            }
+
             std::shared_ptr<std::vector<Window>> ret = std::make_shared<std::vector<Window>>();
-            auto windows = ptrWrapper.determineWindows();
+
             for (const auto window: *windows) {
                 auto w = getWindow(&window);
+//                auto it = processToIndex.find(w->OwnerHandle);
+//                if (it != processToIndex.end()) {
+//                    auto index = it->second;
+//                    for (const auto &item: index) {
+//                        auto dict = static_cast<CFDictionaryRef>(CFArrayGetValueAtIndex(windowList, item));
+//
+//                        auto dims = static_cast<CFDictionaryRef>(CFDictionaryGetValue(dict, kCGWindowBounds));
+//                        CGRect rect;
+//                        CGRectMakeWithDictionaryRepresentation(dims, &rect);
+//                        if (CGRectEqualToRect(window.rect, rect)) {
+//                            uint32_t windowid = 0;
+//                            CFNumberGetValue(static_cast<CFNumberRef>(CFDictionaryGetValue(dict, kCGWindowNumber)),
+//                                             kCFNumberIntType, &windowid);
+//                            w->Handle = windowid;
+//                            break;
+//                        }
+//                    }
+//                }
+
                 ret->emplace_back(*w);
             }
+//            CFRelease(windowList);
             return ret;
         }
 
@@ -134,7 +178,7 @@ namespace SL {
             windowPtr->Size.Width = static_cast<int>(window->rect.size.width);
             windowPtr->Size.Height = static_cast<int>(window->rect.size.height);
             windowPtr->OwnerHandle = static_cast<size_t>(window->pid);
-            windowPtr->Handle = static_cast<size_t>(window->num);
+            windowPtr->Handle = static_cast<size_t>(window->handle);
 
             if (window->title) {
                 windowPtr->Name = *window->title;
@@ -182,7 +226,7 @@ namespace SL {
 
         std::shared_ptr<WindowDataRequest> windowDataRequest(const SingleWindowRequest &singleWindowRequest) {
             auto windowRequestPtr = std::make_shared<WindowDataRequest>((WindowDataRequest) {});
-            windowRequestPtr->num = singleWindowRequest.Handle;
+            windowRequestPtr->handle = singleWindowRequest.Handle;
             windowRequestPtr->pid = singleWindowRequest.OwnerHandle;
             windowRequestPtr->rect = {
                     {static_cast<float>(singleWindowRequest.Position.X), static_cast<float>(singleWindowRequest.Position.Y)},
@@ -190,7 +234,24 @@ namespace SL {
             };
             windowRequestPtr->minimized = singleWindowRequest.Minimized;
             windowRequestPtr->fullscreen = singleWindowRequest.Fullscreen;
+
+            windowRequestPtr->retrieveIcon = singleWindowRequest.RetrieveIcons;
+
             return windowRequestPtr;
+        }
+
+
+        int getTopmostProcess() {
+            int topMostPid = 0;
+            CFDictionaryRef dictTopMost = ptrWrapper.determineFrontmostApplication();
+            CFNumberRef topMostPIDRef = static_cast<CFNumberRef>(CFDictionaryGetValue(dictTopMost, kWindowPid));
+            if (topMostPIDRef == NULL) {
+                ptrWrapper.releaseFrontmostApplication(dictTopMost);
+                return 0;
+            }
+            CFNumberGetValue(topMostPIDRef, kCFNumberIntType, &topMostPid);
+            ptrWrapper.releaseFrontmostApplication(dictTopMost);
+            return topMostPid;
         }
 
     } // namespace Screen_Capture

@@ -4,7 +4,7 @@
 
 @interface NSWindowDataRequest : NSObject
 @property(nonatomic) int pid;
-@property(nonatomic) int num;
+@property(nonatomic) uint32_t handle;
 @property(nonatomic) bool minimized;
 @property(nonatomic) bool fullscreen;
 @property(nonatomic) CGRect rect;
@@ -15,6 +15,7 @@
 @property(nonatomic) int pid;
 @property(nonatomic) CFStringRef title;
 @property(nonatomic) CGRect rect;
+@property(nonatomic) uint32_t handle;
 @property(nonatomic) CFBooleanRef focused;
 @property(nonatomic) CFBooleanRef main;
 @property(nonatomic) CFBooleanRef minimized;

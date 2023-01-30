@@ -81,6 +81,7 @@ elseif (APPLE)
     set(SCREEN_CAPTURE_PLATFORM_INC
             include/ios
             )
+
 else ()
     FIND_PACKAGE(PkgConfig REQUIRED)
 
@@ -158,6 +159,11 @@ add_library(${PROJECT_NAME}
         src/SyncManager.cpp
         ${SCREEN_CAPTURE_PLATFORM_SRC}
         )
+if (APPLE)
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+        MACOS_USE_PRIVATE_API=1)
+endif()
+
 if (${BUILD_SHARED_LIBS})
     set_target_properties(${PROJECT_NAME} PROPERTIES DEFINE_SYMBOL SC_LITE_DLL)
     if (WIN32)
