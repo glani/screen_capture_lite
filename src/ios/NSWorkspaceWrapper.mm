@@ -14,37 +14,33 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
 
 
 @implementation NSWorkspaceWrapper
-- (void)Init
-{
+- (void)Init {
     self = [super init];
 }
 
-- (void)releaseFrontmostApplication:(CFDictionaryRef)query
-{
+- (void)releaseFrontmostApplication:(CFDictionaryRef)query {
     CFRelease(query);
 }
 
-- (void)releaseApplicationValues:(NSArray *)values
-{
+- (void)releaseApplicationValues:(NSArray *)values {
     [values release];
 }
 
-- (NSArray *)determineApplicationValues
-{
+- (NSArray *)determineApplicationValues {
     @autoreleasepool {
         auto pids = [[NSMutableArray alloc] init];
 #if 0
-    NSArray *appsArray = [[NSWorkspace sharedWorkspace] runningApplications];
-    for (NSRunningApplication *a in appsArray) {
-        auto pid = a.processIdentifier;
-        [pids addObject:[NSNumber numberWithInteger:pid]];
-    }
-    [appsArray release];
+        NSArray *appsArray = [[NSWorkspace sharedWorkspace] runningApplications];
+        for (NSRunningApplication *a in appsArray) {
+            auto pid = a.processIdentifier;
+            [pids addObject:[NSNumber numberWithInteger:pid]];
+        }
+        [appsArray release];
 #else
         NSMutableSet *pidSet = [[NSMutableSet alloc] init];
         auto windowList = CGWindowListCopyWindowInfo(kCGWindowListExcludeDesktopElements, kCGNullWindowID);
         CFIndex numWindows = CFArrayGetCount(windowList);
-        for (int i = 0; i < (int)numWindows; i++) {
+        for (int i = 0; i < (int) numWindows; i++) {
             auto dict = static_cast<CFDictionaryRef>(CFArrayGetValueAtIndex(windowList, i));
             auto windowOwnerPID = static_cast<CFNumberRef>(CFDictionaryGetValue(dict, kCGWindowOwnerPID));
             int windowPid;
@@ -62,8 +58,7 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
     }
 }
 
-- (NSArray *)determineWindowsByProcessId:(pid_t)pid
-{
+- (NSArray *)determineWindowsByProcessId:(pid_t)pid {
     auto windows = [[NSMutableArray alloc] init];
 
     auto accessibilityElementWindows = [SCAccessibilityElement createApplicationElement:pid];
@@ -71,7 +66,7 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
 
         auto accessibilityElementAllWindows = [accessibilityElementWindows retrieveAllWindows];
         for (SCAccessibilityElement *window in [accessibilityElementAllWindows getWindowsList]) {
-            SCWindowData *windowSCData = [self createWindowFromSCAccessibilityElement:pid:accessibilityElementAllWindows:window];
+            SCWindowData *windowSCData = [self createWindowFromSCAccessibilityElement:pid :accessibilityElementAllWindows :window];
             if (windowSCData) {
                 [windows addObject:windowSCData];
             }
@@ -84,24 +79,22 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
 
     return windows;
 }
-- (SCWindowData *)createWindowFromSCAccessibilityElement:(pid_t)pid:(SCAccessibilityElementWindows *)mainProcess:(SCAccessibilityElement *)element
-{
+
+- (SCWindowData *)createWindowFromSCAccessibilityElement:(pid_t)pid :(SCAccessibilityElementWindows *)mainProcess :(SCAccessibilityElement *)element {
     auto window = [[SCWindowData alloc] init];
     window.pid = pid;
 
     NSString *processTitle = [mainProcess getProcessTitle];
     if (processTitle) {
-        window.processTitle = (CFStringRef)CFRetain((__bridge CFStringRef)processTitle);
-    }
-    else {
+        window.processTitle = (CFStringRef) CFRetain((__bridge CFStringRef) processTitle);
+    } else {
         window.processTitle = nil;
     }
     [element enrich:window];
     return window;
 }
 
-- (Boolean)requestAccessibilityPermissions
-{
+- (Boolean)requestAccessibilityPermissions {
     @autoreleasepool {
         SCAccessibilityElement *accessibilityElement = nullptr;
         accessibilityElement = [SCAccessibilityElement frontmostApplicationElement];
@@ -109,7 +102,7 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
             auto pids = [self determineApplicationValues];
             for (id number in pids) {
                 pid_t pid;
-                CFNumberGetValue((CFNumberRef)number, kCFNumberIntType, &pid);
+                CFNumberGetValue((CFNumberRef) number, kCFNumberIntType, &pid);
                 accessibilityElement = [SCAccessibilityElement createApplicationElement:pid];
                 if (accessibilityElement) {
                     break;
@@ -127,9 +120,9 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
     return FALSE;
 }
 
-- (CFDictionaryRef)determineFrontmostApplication
-{
-    CFMutableDictionaryRef query = CFDictionaryCreateMutable(NULL, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+- (CFDictionaryRef)determineFrontmostApplication {
+    CFMutableDictionaryRef query = CFDictionaryCreateMutable(NULL, 0, &kCFTypeDictionaryKeyCallBacks,
+                                                             &kCFTypeDictionaryValueCallBacks);
     @autoreleasepool {
         auto application = [[NSWorkspace sharedWorkspace] frontmostApplication];
 
@@ -139,14 +132,16 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
             auto executableURL = [application executableURL];
             if (executableURL) {
                 CFStringRef absoluteString =
-                    CFStringCreateWithCString((CFAllocatorRef)NULL, [executableURL absoluteString].UTF8String, kCFStringEncodingUTF8);
+                        CFStringCreateWithCString((CFAllocatorRef) NULL, [executableURL absoluteString].UTF8String,
+                                                  kCFStringEncodingUTF8);
                 CFDictionarySetValue(query, kWindowAbsoluteUrlString, absoluteString);
 
                 CFRelease(absoluteString);
             }
             CFStringRef localizedName =
-                CFStringCreateWithCString((CFAllocatorRef)NULL, [application localizedName].UTF8String, kCFStringEncodingUTF8);
-            CFNumberRef processIdentifier = CFNumberCreate((CFAllocatorRef)NULL, kCFNumberIntType, &pid);
+                    CFStringCreateWithCString((CFAllocatorRef) NULL, [application localizedName].UTF8String,
+                                              kCFStringEncodingUTF8);
+            CFNumberRef processIdentifier = CFNumberCreate((CFAllocatorRef) NULL, kCFNumberIntType, &pid);
             CFDictionarySetValue(query, kWindowPid, processIdentifier);
             CFDictionarySetValue(query, kWindowLocalizedName, localizedName);
 
@@ -158,12 +153,11 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
     return query;
 }
 
-- (void)dealloc
-{
+- (void)dealloc {
     [super dealloc];
 }
-- (SCWindowData *)minimizeWindow:(NSWindowDataRequest *)request:(bool)minimize
-{
+
+- (SCWindowData *)minimizeWindow:(NSWindowDataRequest *)request :(bool)minimize {
     SCWindowData *res = nil;
     int pid = [request pid];
     auto appElement = [SCAccessibilityElement createApplicationElement:pid];
@@ -172,45 +166,21 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
         SCAccessibilityElement *windowRes = nil;
         NSArray *windowsList = [windowsElement getWindowsList];
         for (SCAccessibilityElement *window in windowsList) {
-            if ([window determineRequiredWindow:request:[windowsList count] == 1]) {
+            if ([window determineRequiredWindow:request :[windowsList count] == 1]) {
                 windowRes = window;
                 break;
             }
         }
         if (windowRes) {
             [windowRes minimizeWindow:minimize];
-            res = [self createWindowFromSCAccessibilityElement:pid:windowsElement:windowRes];
-        }
-        [windowsElement release];
-    }
-    return res;
-}
-- (SCWindowData *)fullscreenWindow:(NSWindowDataRequest *)request:(int)display:(bool)fullscreen
-{
-    SCWindowData *res = nil;
-    int pid = [request pid];
-    auto appElement = [SCAccessibilityElement createApplicationElement:pid];
-    if (appElement) {
-        SCAccessibilityElementWindows *windowsElement = [appElement retrieveAllWindows];
-        SCAccessibilityElement *windowRes = nil;
-        NSArray *windowsList = [windowsElement getWindowsList];
-        for (SCAccessibilityElement *window in windowsList) {
-            if ([window determineRequiredWindow:request:[windowsList count] == 1]) {
-                windowRes = window;
-                break;
-            }
-        }
-        if (windowRes) {
-            [windowRes fullscreenWindow:display:fullscreen];
-            res = [self createWindowFromSCAccessibilityElement:pid:windowsElement:windowRes];
+            res = [self createWindowFromSCAccessibilityElement:pid :windowsElement :windowRes];
         }
         [windowsElement release];
     }
     return res;
 }
 
-- (SCWindowData *)setRectWindow:(NSWindowDataRequest *)request:(CGRect)rect
-{
+- (SCWindowData *)fullscreenWindow:(NSWindowDataRequest *)request :(int)display :(bool)fullscreen {
     SCWindowData *res = nil;
     int pid = [request pid];
     auto appElement = [SCAccessibilityElement createApplicationElement:pid];
@@ -219,22 +189,44 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
         SCAccessibilityElement *windowRes = nil;
         NSArray *windowsList = [windowsElement getWindowsList];
         for (SCAccessibilityElement *window in windowsList) {
-            if ([window determineRequiredWindow:request:[windowsList count] == 1]) {
+            if ([window determineRequiredWindow:request :[windowsList count] == 1]) {
+                windowRes = window;
+                break;
+            }
+        }
+        if (windowRes) {
+            [windowRes fullscreenWindow:display :fullscreen];
+            res = [self createWindowFromSCAccessibilityElement:pid :windowsElement :windowRes];
+        }
+        [windowsElement release];
+    }
+    return res;
+}
+
+- (SCWindowData *)setRectWindow:(NSWindowDataRequest *)request :(CGRect)rect {
+    SCWindowData *res = nil;
+    int pid = [request pid];
+    auto appElement = [SCAccessibilityElement createApplicationElement:pid];
+    if (appElement) {
+        SCAccessibilityElementWindows *windowsElement = [appElement retrieveAllWindows];
+        SCAccessibilityElement *windowRes = nil;
+        NSArray *windowsList = [windowsElement getWindowsList];
+        for (SCAccessibilityElement *window in windowsList) {
+            if ([window determineRequiredWindow:request :[windowsList count] == 1]) {
                 windowRes = window;
                 break;
             }
         }
         if (windowRes) {
             [windowRes setRectOfElement:rect];
-            res = [self createWindowFromSCAccessibilityElement:pid:windowsElement:windowRes];
+            res = [self createWindowFromSCAccessibilityElement:pid :windowsElement :windowRes];
         }
         [windowsElement release];
     }
     return res;
 }
 
-- (SCWindowData *)topMostWindow:(NSWindowDataRequest *)request
-{
+- (SCWindowData *)topMostWindow:(NSWindowDataRequest *)request {
     SCWindowData *res = nil;
     int pid = [request pid];
     auto appElement = [SCAccessibilityElement createApplicationElement:pid];
@@ -243,21 +235,21 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
         SCAccessibilityElement *windowRes = nil;
         NSArray *windowsList = [windowsElement getWindowsList];
         for (SCAccessibilityElement *window in windowsList) {
-            if ([window determineRequiredWindow:request:[windowsList count] == 1]) {
+            if ([window determineRequiredWindow:request :[windowsList count] == 1]) {
                 windowRes = window;
                 break;
             }
         }
         if (windowRes) {
             [windowRes topMostWindow];
-            res = [self createWindowFromSCAccessibilityElement:pid:windowsElement:windowRes];
+            res = [self createWindowFromSCAccessibilityElement:pid :windowsElement :windowRes];
         }
         [windowsElement release];
     }
     return res;
 }
-- (SCWindowData *)getWindow:(NSWindowDataRequest *)request
-{
+
+- (SCWindowData *)getWindow:(NSWindowDataRequest *)request {
     SCWindowData *res = nil;
     int pid = [request pid];
     auto appElement = [SCAccessibilityElement createApplicationElement:pid];
@@ -266,13 +258,13 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
         SCAccessibilityElement *windowRes = nil;
         NSArray *windowsList = [windowsElement getWindowsList];
         for (SCAccessibilityElement *window in windowsList) {
-            if ([window determineRequiredWindow:request:[windowsList count] == 1]) {
+            if ([window determineRequiredWindow:request :[windowsList count] == 1]) {
                 windowRes = window;
                 break;
             }
         }
         if (windowRes) {
-            res = [self createWindowFromSCAccessibilityElement:pid:windowsElement:windowRes];
+            res = [self createWindowFromSCAccessibilityElement:pid :windowsElement :windowRes];
         }
         [windowsElement release];
     }
@@ -281,370 +273,392 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
 @end
 
 namespace SL {
-namespace Screen_Capture {
+    namespace Screen_Capture {
 
-    struct NSWorkspaceWrapperImpl {
-        NSWorkspaceWrapper *ptr = nullptr;
+        struct NSWorkspaceWrapperImpl {
+            NSWorkspaceWrapper *ptr = nullptr;
 
-        NSWorkspaceWrapperImpl() { ptr = [[NSWorkspaceWrapper alloc] init]; }
+            NSWorkspaceWrapperImpl() { ptr = [[NSWorkspaceWrapper alloc] init]; }
 
-        ~NSWorkspaceWrapperImpl()
-        {
-            if (ptr) {
-                auto r = CFGetRetainCount(ptr);
-                while (r != 1) {
-                    r = CFGetRetainCount(ptr);
-                }
-                [ptr release];
-                ptr = nullptr;
-            }
-        }
-
-        CFDictionaryRef determineFrontmostApplication() { return [ptr determineFrontmostApplication]; }
-
-        Boolean requestAccessibilityPermissions() { return [ptr requestAccessibilityPermissions]; }
-
-        std::shared_ptr<std::map<int, struct ApplicationData>> determineApplicationValues()
-        {
-            std::shared_ptr<std::map<int, struct ApplicationData>> data = std::make_shared<std::map<int, struct ApplicationData>>();
-            NSArray *values = [ptr determineApplicationValues];
-            for (NSNumber *value in values) {
-                struct ApplicationData ad;
-                ad.pid = value.intValue;
-                data->emplace(std::make_pair(ad.pid, ad));
-            }
-
-            [ptr releaseApplicationValues:values];
-            return data;
-        };
-
-        void releaseFrontmostApplication(CFDictionaryRef query) { [ptr releaseFrontmostApplication:query]; }
-
-        void releaseApplicationValues(NSArray *values) { [ptr releaseApplicationValues:values]; }
-
-        std::shared_ptr<struct WindowData> minimizeWindow(const WindowDataRequest &windowRequest, bool minimize)
-        {
-            int pid = windowRequest.pid;
-            auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
-            std::shared_ptr<std::string> execute;
-            if (application) {
-                std::shared_ptr<std::string> icon;
-                if (windowRequest.retrieveIcon) {
-                    icon = retrieveIconFromApplication(application);
-                }
-                std::shared_ptr<std::string> execute = retrieveExecutableURL(application);
-                NSWindowDataRequest *windowDataRequest = createNSWindowDataRequest(windowRequest);
-                SCWindowData *window = [ptr minimizeWindow:windowDataRequest:minimize];
-                [windowDataRequest release];
-                if (window) {
-                    auto windows = [[NSMutableArray alloc] init];
-                    [windows addObject:window];
-                    std::shared_ptr<std::vector<struct WindowData>> data = std::make_shared<std::vector<struct WindowData>>();
-                    this->processWindows(windows, pid, data.get(), execute, icon);
-                    CFRelease(windows);
-                    if (!data->empty()) {
-                        return std::make_shared<struct WindowData>(data->at(0));
+            ~NSWorkspaceWrapperImpl() {
+                if (ptr) {
+                    auto r = CFGetRetainCount(ptr);
+                    while (r != 1) {
+                        r = CFGetRetainCount(ptr);
                     }
+                    [ptr release];
+                    ptr = nullptr;
                 }
             }
-            return nullptr;
-        }
 
-        std::shared_ptr<struct WindowData> fullscreenWindow(const WindowDataRequest &windowRequest, int display, bool fullscreen)
-        {
-            int pid = windowRequest.pid;
-            auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
-            std::shared_ptr<std::string> execute;
-            if (application) {
-                std::shared_ptr<std::string> icon;
-                if (windowRequest.retrieveIcon) {
-                    icon = retrieveIconFromApplication(application);
-                }
-                std::shared_ptr<std::string> execute = retrieveExecutableURL(application);
-                NSWindowDataRequest *windowDataRequest = createNSWindowDataRequest(windowRequest);
-                SCWindowData *window = [ptr fullscreenWindow:windowDataRequest:display:fullscreen];
-                [windowDataRequest release];
-                if (window) {
-                    auto windows = [[NSMutableArray alloc] init];
-                    [windows addObject:window];
-                    std::shared_ptr<std::vector<struct WindowData>> data = std::make_shared<std::vector<struct WindowData>>();
-                    this->processWindows(windows, pid, data.get(), execute, icon);
-                    CFRelease(windows);
-                    if (!data->empty()) {
-                        return std::make_shared<struct WindowData>(data->at(0));
-                    }
-                }
-            }
-            return nullptr;
-        }
+            CFDictionaryRef determineFrontmostApplication() { return [ptr determineFrontmostApplication]; }
 
-        std::shared_ptr<struct WindowData> getWindow(const WindowDataRequest &windowRequest) {
-            int pid = windowRequest.pid;
-            auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
-            std::shared_ptr<std::string> execute;
-            if (application) {
-                std::shared_ptr<std::string> icon;
-                if (windowRequest.retrieveIcon) {
-                    icon = retrieveIconFromApplication(application);
-                }
-                std::shared_ptr<std::string> execute = retrieveExecutableURL(application);
-                NSWindowDataRequest *windowDataRequest = createNSWindowDataRequest(windowRequest);
-                SCWindowData *window = [ptr getWindow:windowDataRequest];
-                [windowDataRequest release];
-                if (window) {
-                    auto windows = [[NSMutableArray alloc] init];
-                    [windows addObject:window];
-                    std::shared_ptr<std::vector<struct WindowData>> data = std::make_shared<std::vector<struct WindowData>>();
-                    this->processWindows(windows, pid, data.get(), execute, icon);
-                    CFRelease(windows);
-                    if (!data->empty()) {
-                        return std::make_shared<struct WindowData>(data->at(0));
-                    }
-                }
-            }
-            return nullptr;
-        }
+            Boolean requestAccessibilityPermissions() { return [ptr requestAccessibilityPermissions]; }
 
-        std::shared_ptr<struct WindowData> topMostWindow(const WindowDataRequest &windowRequest)
-        {
-            int pid = windowRequest.pid;
-            auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
-            std::shared_ptr<std::string> execute;
-            if (application) {
-                std::shared_ptr<std::string> icon;
-                if (windowRequest.retrieveIcon) {
-                    icon = retrieveIconFromApplication(application);
+            std::shared_ptr<std::map<int, struct ApplicationData>> determineApplicationValues() {
+                std::shared_ptr<std::map<int, struct ApplicationData>> data = std::make_shared<std::map<int, struct ApplicationData>>();
+                NSArray *values = [ptr determineApplicationValues];
+                for (NSNumber *value in values) {
+                    struct ApplicationData ad;
+                    ad.pid = value.intValue;
+                    data->emplace(std::make_pair(ad.pid, ad));
                 }
-                std::shared_ptr<std::string> execute = retrieveExecutableURL(application);
-                NSWindowDataRequest *windowDataRequest = createNSWindowDataRequest(windowRequest);
-                SCWindowData *window = [ptr topMostWindow:windowDataRequest];
-                [windowDataRequest release];
-                if (window) {
-                    [application activateWithOptions:NSApplicationActivateIgnoringOtherApps];
-                    auto windows = [[NSMutableArray alloc] init];
-                    [windows addObject:window];
-                    std::shared_ptr<std::vector<struct WindowData>> data = std::make_shared<std::vector<struct WindowData>>();
-                    this->processWindows(windows, pid, data.get(), execute, icon);
-                    CFRelease(windows);
-                    if (!data->empty()) {
-                        return std::make_shared<struct WindowData>(data->at(0));
-                    }
-                }
-            }
-            return nullptr;
-        }
 
-        std::shared_ptr<struct WindowData> rectWindow(const WindowDataRequest &windowRequest, const CGRect &rect)
-        {
-            int pid = windowRequest.pid;
-            auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
-            std::shared_ptr<std::string> execute;
-            if (application) {
-                std::shared_ptr<std::string> icon;
-                if (windowRequest.retrieveIcon) {
-                    icon = retrieveIconFromApplication(application);
-                }
-                std::shared_ptr<std::string> execute = retrieveExecutableURL(application);
-                NSWindowDataRequest *windowDataRequest = createNSWindowDataRequest(windowRequest);
-                SCWindowData *window = [ptr setRectWindow:windowDataRequest:rect];
-                [windowDataRequest release];
-                if (window) {
-                    auto windows = [[NSMutableArray alloc] init];
-                    [windows addObject:window];
-                    std::shared_ptr<std::vector<struct WindowData>> data = std::make_shared<std::vector<struct WindowData>>();
-                    this->processWindows(windows, pid, data.get(), execute, icon);
-                    CFRelease(windows);
-                    if (!data->empty()) {
-                        return std::make_shared<struct WindowData>(data->at(0));
-                    }
-                }
-            }
-            return nullptr;
-        }
+                [ptr releaseApplicationValues:values];
+                return data;
+            };
 
-        std::shared_ptr<std::vector<struct WindowData>> determineWindows(bool retrieveIcon)
-        {
-            std::shared_ptr<std::vector<struct WindowData>> data = std::make_shared<std::vector<struct WindowData>>();
-            NSArray *values = [ptr determineApplicationValues];
-            for (NSNumber *value in values) {
-                int pid = value.intValue;
+            void releaseFrontmostApplication(CFDictionaryRef query) { [ptr releaseFrontmostApplication:query]; }
+
+            void releaseApplicationValues(NSArray *values) { [ptr releaseApplicationValues:values]; }
+
+            std::shared_ptr<struct WindowData> minimizeWindow(const WindowDataRequest &windowRequest, bool minimize) {
+                int pid = windowRequest.pid;
                 auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
                 std::shared_ptr<std::string> execute;
                 if (application) {
+                    std::shared_ptr<std::string> icon;
+                    if (windowRequest.retrieveIcon) {
+                        icon = retrieveIconFromApplication(application);
+                    }
+                    std::shared_ptr<std::string> execute = retrieveExecutableURL(application);
+                    NSWindowDataRequest *windowDataRequest = createNSWindowDataRequest(windowRequest);
+                    SCWindowData *window = [ptr minimizeWindow:windowDataRequest :minimize];
+                    [windowDataRequest release];
+                    if (window) {
+                        auto windows = [[NSMutableArray alloc] init];
+                        [windows addObject:window];
+                        std::shared_ptr<std::vector<struct WindowData>> data = std::make_shared<std::vector<struct WindowData>>();
+                        this->processWindows(windows, pid, data.get(), execute, icon);
+                        CFRelease(windows);
+                        if (!data->empty()) {
+                            return std::make_shared<struct WindowData>(data->at(0));
+                        }
+                    }
+                }
+                return nullptr;
+            }
+
+            std::shared_ptr<struct WindowData>
+            fullscreenWindow(const WindowDataRequest &windowRequest, int display, bool fullscreen) {
+                int pid = windowRequest.pid;
+                auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
+                std::shared_ptr<std::string> execute;
+                if (application) {
+                    std::shared_ptr<std::string> icon;
+                    if (windowRequest.retrieveIcon) {
+                        icon = retrieveIconFromApplication(application);
+                    }
+                    std::shared_ptr<std::string> execute = retrieveExecutableURL(application);
+                    NSWindowDataRequest *windowDataRequest = createNSWindowDataRequest(windowRequest);
+                    SCWindowData *window = [ptr fullscreenWindow:windowDataRequest :display :fullscreen];
+                    [windowDataRequest release];
+                    if (window) {
+                        auto windows = [[NSMutableArray alloc] init];
+                        [windows addObject:window];
+                        std::shared_ptr<std::vector<struct WindowData>> data = std::make_shared<std::vector<struct WindowData>>();
+                        this->processWindows(windows, pid, data.get(), execute, icon);
+                        CFRelease(windows);
+                        if (!data->empty()) {
+                            return std::make_shared<struct WindowData>(data->at(0));
+                        }
+                    }
+                }
+                return nullptr;
+            }
+
+            std::shared_ptr<struct WindowData> getWindow(const WindowDataRequest &windowRequest) {
+                int pid = windowRequest.pid;
+                auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
+                std::shared_ptr<std::string> execute;
+                if (application) {
+                    std::shared_ptr<std::string> icon;
+                    if (windowRequest.retrieveIcon) {
+                        icon = retrieveIconFromApplication(application);
+                    }
+                    std::shared_ptr<std::string> execute = retrieveExecutableURL(application);
+                    NSWindowDataRequest *windowDataRequest = createNSWindowDataRequest(windowRequest);
+                    SCWindowData *window = [ptr getWindow:windowDataRequest];
+                    [windowDataRequest release];
+                    if (window) {
+                        auto windows = [[NSMutableArray alloc] init];
+                        [windows addObject:window];
+                        std::shared_ptr<std::vector<struct WindowData>> data = std::make_shared<std::vector<struct WindowData>>();
+                        this->processWindows(windows, pid, data.get(), execute, icon);
+                        CFRelease(windows);
+                        if (!data->empty()) {
+                            return std::make_shared<struct WindowData>(data->at(0));
+                        }
+                    }
+                }
+                return nullptr;
+            }
+
+            std::shared_ptr<struct WindowData> topMostWindow(const WindowDataRequest &windowRequest) {
+                int pid = windowRequest.pid;
+                auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
+                std::shared_ptr<std::string> execute;
+                if (application) {
+                    std::shared_ptr<std::string> icon;
+                    if (windowRequest.retrieveIcon) {
+                        icon = retrieveIconFromApplication(application);
+                    }
+                    std::shared_ptr<std::string> execute = retrieveExecutableURL(application);
+                    NSWindowDataRequest *windowDataRequest = createNSWindowDataRequest(windowRequest);
+                    SCWindowData *window = [ptr topMostWindow:windowDataRequest];
+                    [windowDataRequest release];
+                    if (window) {
+                        [application activateWithOptions:NSApplicationActivateIgnoringOtherApps];
+                        auto windows = [[NSMutableArray alloc] init];
+                        [windows addObject:window];
+                        std::shared_ptr<std::vector<struct WindowData>> data = std::make_shared<std::vector<struct WindowData>>();
+                        this->processWindows(windows, pid, data.get(), execute, icon);
+                        CFRelease(windows);
+                        if (!data->empty()) {
+                            return std::make_shared<struct WindowData>(data->at(0));
+                        }
+                    }
+                }
+                return nullptr;
+            }
+
+            std::shared_ptr<struct WindowData> rectWindow(const WindowDataRequest &windowRequest, const CGRect &rect) {
+                int pid = windowRequest.pid;
+                auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
+                std::shared_ptr<std::string> execute;
+                if (application) {
+                    std::shared_ptr<std::string> icon;
+                    if (windowRequest.retrieveIcon) {
+                        icon = retrieveIconFromApplication(application);
+                    }
+                    std::shared_ptr<std::string> execute = retrieveExecutableURL(application);
+                    NSWindowDataRequest *windowDataRequest = createNSWindowDataRequest(windowRequest);
+                    SCWindowData *window = [ptr setRectWindow:windowDataRequest :rect];
+                    [windowDataRequest release];
+                    if (window) {
+                        auto windows = [[NSMutableArray alloc] init];
+                        [windows addObject:window];
+                        std::shared_ptr<std::vector<struct WindowData>> data = std::make_shared<std::vector<struct WindowData>>();
+                        this->processWindows(windows, pid, data.get(), execute, icon);
+                        CFRelease(windows);
+                        if (!data->empty()) {
+                            return std::make_shared<struct WindowData>(data->at(0));
+                        }
+                    }
+                }
+                return nullptr;
+            }
+
+            std::shared_ptr<std::vector<struct WindowData>> determineWindows(bool retrieveIcon) {
+                std::shared_ptr<std::vector<struct WindowData>> data = std::make_shared<std::vector<struct WindowData>>();
+                NSArray *values = [ptr determineApplicationValues];
+                for (NSNumber *value in values) {
+                    int pid = value.intValue;
+                    auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
                     std::shared_ptr<std::string> execute;
+                    if (application) {
+                        std::shared_ptr<std::string> execute;
+                        std::shared_ptr<std::string> icon;
+                        if (retrieveIcon) {
+                            icon = retrieveIconFromApplication(application);
+                        }
+                        execute = retrieveExecutableURL(application);
+                        NSArray *windows = [ptr determineWindowsByProcessId:pid];
+                        this->processWindows(windows, pid, data.get(), execute, icon);
+                        CFRelease(windows);
+                    }
+                }
+
+                [ptr releaseApplicationValues:values];
+                return data;
+            }
+
+            std::shared_ptr<std::vector<struct WindowData>> determineWindows(int pid, bool retrieveIcon) {
+                std::shared_ptr<std::vector<struct WindowData>> data = std::make_shared<std::vector<struct WindowData>>();
+                NSArray *windows = [ptr determineWindowsByProcessId:pid];
+                auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
+                if (application) {
+                    std::shared_ptr<std::string> execute;
+                    execute = retrieveExecutableURL(application);
                     std::shared_ptr<std::string> icon;
                     if (retrieveIcon) {
                         icon = retrieveIconFromApplication(application);
                     }
-                    execute = retrieveExecutableURL(application);
-                    NSArray *windows = [ptr determineWindowsByProcessId:pid];
                     this->processWindows(windows, pid, data.get(), execute, icon);
-                    CFRelease(windows);
                 }
+                CFRelease(windows);
+                return data;
             }
 
-            [ptr releaseApplicationValues:values];
-            return data;
-        }
-
-        std::shared_ptr<std::vector<struct WindowData>> determineWindows(int pid, bool retrieveIcon)
-        {
-            std::shared_ptr<std::vector<struct WindowData>> data = std::make_shared<std::vector<struct WindowData>>();
-            NSArray *windows = [ptr determineWindowsByProcessId:pid];
-            auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
-            if (application) {
+            std::shared_ptr<std::string> retrieveExecutableURL(NSRunningApplication *application) {
                 std::shared_ptr<std::string> execute;
+                auto executableURL = [application executableURL];
+                if (executableURL) {
+                    CFStringRef valueCSStr = (__bridge CFStringRef) [executableURL absoluteString];
+                    execute = getString(valueCSStr);
+                }
+                return execute;
+            }
+
+            std::shared_ptr<std::string> retrieveIconFromApplication(NSRunningApplication *application) {
                 std::shared_ptr<std::string> icon;
-                if (retrieveIcon) {
-                    icon = retrieveIconFromApplication(application);
+                auto image = [application icon];
+                auto bundle = [application bundleIdentifier];
+
+                if (image) {
+                    @autoreleasepool {
+                        const CGRect &rect = CGRectMake(0, 0, 512, 512);
+                        NSBitmapImageRep *imageHighRes = [image bestRepresentationForRect:rect context:nil hints:nil];
+                        if (imageHighRes) {
+                            auto img = [[NSImage alloc] initWithSize:[imageHighRes size]];
+                            [img addRepresentation:imageHighRes];
+
+                            CGImageRef cgRef = [img CGImageForProposedRect:NULL context:nil hints:nil];
+                            auto newRep = [[NSBitmapImageRep alloc] initWithCGImage:cgRef];
+                            [newRep setSize:[img size]];
+
+                            NSData *pngData = [newRep representationUsingType:NSPNGFileType properties:nil];
+                            auto encodedString = [pngData base64Encoding];
+
+                            NSString *value = [NSString stringWithFormat:@"data:image/png;base64,%@", encodedString];
+                            CFStringRef valueCSStr = (__bridge CFStringRef) value;
+                            icon = getString(valueCSStr);
+                            [imageHighRes autorelease];
+                            [newRep autorelease];
+                        } else {
+                            CGImageRef cgRef = [image CGImageForProposedRect:NULL context:nil hints:nil];
+                            NSBitmapImageRep *newRep = [[NSBitmapImageRep alloc] initWithCGImage:cgRef];
+                            [newRep setSize:[image size]];
+                            NSData *pngData = [newRep representationUsingType:NSPNGFileType properties:nil];
+                            auto encodedString = [pngData base64Encoding];
+                            NSString *value = [NSString stringWithFormat:@"data:image/png;base64,%@", encodedString];
+                            CFStringRef valueCSStr = (__bridge CFStringRef) value;
+                            icon = getString(valueCSStr);
+                            [newRep autorelease];
+                        }
+                    }
                 }
-                execute = retrieveExecutableURL(application);
-                this->processWindows(windows, pid, data.get(), execute, icon);
+                return icon;
             }
-            CFRelease(windows);
-            return data;
-        }
 
-        std::shared_ptr<std::string> retrieveExecutableURL(NSRunningApplication *application)
-        {
-            std::shared_ptr<std::string> execute;
-            auto executableURL = [application executableURL];
-            if (executableURL) {
-                CFStringRef valueCSStr = (__bridge CFStringRef)[executableURL absoluteString];
-                execute = getString(valueCSStr);
+
+            void processWindows(NSArray *windows, int pid, std::vector<struct WindowData> *data,
+                                std::shared_ptr<std::string> &execute,
+                                std::shared_ptr<std::string> &icon) {
+                int i = 0;
+                for (SCWindowData *window in windows) {
+                    struct WindowData wd;
+                    wd.handle = [window handle];
+                    i++;
+                    wd.pid = pid;
+                    wd.rect = [window rect];
+
+                    CFStringRef processTitle = [window processTitle];
+                    if (processTitle != nullptr) {
+                        wd.processTitle = getString(processTitle);
+                    }
+
+                    CFStringRef title = [window title];
+                    if (title != nullptr) {
+                        wd.title = getString(title);
+                    }
+
+                    CFBooleanRef focused = [window focused];
+                    if (focused != nullptr) {
+                        wd.focused = std::make_shared<bool>(CFBooleanGetValue(focused));
+                    }
+
+                    CFBooleanRef main = [window main];
+                    if (main != nullptr) {
+                        wd.main = std::make_shared<bool>(CFBooleanGetValue(main));
+                    }
+
+                    CFBooleanRef minimized = [window minimized];
+                    if (minimized != nullptr) {
+                        wd.minimized = std::make_shared<bool>(CFBooleanGetValue(minimized));
+                    }
+
+                    CFBooleanRef fullscreen = [window fullscreen];
+                    if (fullscreen != nullptr) {
+                        wd.fullscreen = std::make_shared<bool>(CFBooleanGetValue(fullscreen));
+                    }
+
+                    if (execute) {
+                        wd.execute = execute;
+                    }
+
+                    wd.icon = icon;
+
+                    CFRelease(window);
+                    data->push_back(wd);
+                }
             }
-            return execute;
-        }
 
-        std::shared_ptr<std::string> retrieveIconFromApplication(NSRunningApplication *application)
-        {
-            std::shared_ptr<std::string> icon;
-            auto image = [application icon];
-            if (image) {
-                CGImageRef cgRef = [image CGImageForProposedRect:NULL context:nil hints:nil];
-                NSBitmapImageRep *newRep = [[NSBitmapImageRep alloc] initWithCGImage:cgRef];
-                [newRep setSize:[image size]];
-                NSData *pngData = [newRep representationUsingType:NSPNGFileType properties:nil];
-                auto encodedString = [pngData base64Encoding];
-                NSString *value = [NSString stringWithFormat:@"data:image/png;base64,%@", encodedString];
-                CFStringRef valueCSStr = (__bridge CFStringRef)value;
-                icon = getString(valueCSStr);
-                [newRep autorelease];
+            NSWindowDataRequest *createNSWindowDataRequest(const WindowDataRequest &request) {
+                auto res = [[NSWindowDataRequest alloc] init];
+                [res setFullscreen:request.fullscreen];
+                [res setMinimized:request.minimized];
+                [res setHandle:request.handle];
+                [res setPid:request.pid];
+                [res setRect:request.rect];
+                return res;
             }
-            return icon;
-        }
+        };
 
-        void processWindows(NSArray *windows, int pid, std::vector<struct WindowData> *data, std::shared_ptr<std::string> &execute,
-                            std::shared_ptr<std::string> &icon)
-        {
-            int i = 0;
-            for (SCWindowData *window in windows) {
-                struct WindowData wd;
-                wd.handle = [window handle];
-                i++;
-                wd.pid = pid;
-                wd.rect = [window rect];
+        NSWorkspaceWrapperImpl *CreateNSWorkspaceWrapperImpl() { return new NSWorkspaceWrapperImpl(); }
 
-                CFStringRef processTitle = [window processTitle];
-                if (processTitle != nullptr) {
-                    wd.processTitle = getString(processTitle);
-                }
-
-                CFStringRef title = [window title];
-                if (title != nullptr) {
-                    wd.title = getString(title);
-                }
-
-                CFBooleanRef focused = [window focused];
-                if (focused != nullptr) {
-                    wd.focused = std::make_shared<bool>(CFBooleanGetValue(focused));
-                }
-
-                CFBooleanRef main = [window main];
-                if (main != nullptr) {
-                    wd.main = std::make_shared<bool>(CFBooleanGetValue(main));
-                }
-
-                CFBooleanRef minimized = [window minimized];
-                if (minimized != nullptr) {
-                    wd.minimized = std::make_shared<bool>(CFBooleanGetValue(minimized));
-                }
-
-                CFBooleanRef fullscreen = [window fullscreen];
-                if (fullscreen != nullptr) {
-                    wd.fullscreen = std::make_shared<bool>(CFBooleanGetValue(fullscreen));
-                }
-
-                if (execute) {
-                    wd.execute = execute;
-                }
-
-                wd.icon = icon;
-
-                CFRelease(window);
-                data->push_back(wd);
+        void DestroyNSWorkspaceWrapperImpl(NSWorkspaceWrapperImpl *p) {
+            if (p) {
+                delete p;
             }
         }
 
-        NSWindowDataRequest *createNSWindowDataRequest(const WindowDataRequest &request)
-        {
-            auto res = [[NSWindowDataRequest alloc] init];
-            [res setFullscreen:request.fullscreen];
-            [res setMinimized:request.minimized];
-            [res setHandle:request.handle];
-            [res setPid:request.pid];
-            [res setRect:request.rect];
-            return res;
+        CFDictionaryRef
+        determineFrontmostApplicationWrap(NSWorkspaceWrapperImpl *p) { return p->determineFrontmostApplication(); }
+
+        Boolean
+        requestAccessibilityPermissionsWrap(NSWorkspaceWrapperImpl *p) { return p->requestAccessibilityPermissions(); }
+
+        std::shared_ptr<std::map<int, struct ApplicationData>>
+        determineApplicationValuesWrap(NSWorkspaceWrapperImpl *p) {
+            return p->determineApplicationValues();
         }
-    };
 
-    NSWorkspaceWrapperImpl *CreateNSWorkspaceWrapperImpl() { return new NSWorkspaceWrapperImpl(); }
-
-    void DestroyNSWorkspaceWrapperImpl(NSWorkspaceWrapperImpl *p)
-    {
-        if (p) {
-            delete p;
+        std::shared_ptr<std::vector<struct WindowData>>
+        determineWindowsWrap(NSWorkspaceWrapperImpl *p, int pid, bool retrieveIcon) {
+            return p->determineWindows(pid, retrieveIcon);
         }
-    }
 
-    CFDictionaryRef determineFrontmostApplicationWrap(NSWorkspaceWrapperImpl *p) { return p->determineFrontmostApplication(); }
+        std::shared_ptr<std::vector<struct WindowData>>
+        determineWindowsWrap(NSWorkspaceWrapperImpl *p, bool retrieveIcon) { return p->determineWindows(retrieveIcon); }
 
-    Boolean requestAccessibilityPermissionsWrap(NSWorkspaceWrapperImpl *p) { return p->requestAccessibilityPermissions(); }
+        std::shared_ptr<struct WindowData>
+        minimizeWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest &windowRequest, bool minimize) {
+            return p->minimizeWindow(windowRequest, minimize);
+        }
 
-    std::shared_ptr<std::map<int, struct ApplicationData>> determineApplicationValuesWrap(NSWorkspaceWrapperImpl *p)
-    {
-        return p->determineApplicationValues();
-    }
+        std::shared_ptr<struct WindowData>
+        fullscreenWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest &windowRequest, int display,
+                             bool fullscreen) {
+            return p->fullscreenWindow(windowRequest, display, fullscreen);
+        }
 
-    std::shared_ptr<std::vector<struct WindowData>> determineWindowsWrap(NSWorkspaceWrapperImpl *p, int pid, bool retrieveIcon) { return p->determineWindows(pid, retrieveIcon); }
-    std::shared_ptr<std::vector<struct WindowData>> determineWindowsWrap(NSWorkspaceWrapperImpl *p, bool retrieveIcon) { return p->determineWindows(retrieveIcon); }
+        std::shared_ptr<struct WindowData>
+        rectWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest &windowRequest, const CGRect &rect) {
+            return p->rectWindow(windowRequest, rect);
+        }
 
-    std::shared_ptr<struct WindowData> minimizeWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest &windowRequest, bool minimize)
-    {
-        return p->minimizeWindow(windowRequest, minimize);
-    }
+        std::shared_ptr<struct WindowData>
+        topMostWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest &windowRequest) {
+            return p->topMostWindow(windowRequest);
+        }
 
-    std::shared_ptr<struct WindowData> fullscreenWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest &windowRequest, int display,
-                                                            bool fullscreen)
-    {
-        return p->fullscreenWindow(windowRequest, display, fullscreen);
-    }
+        std::shared_ptr<struct WindowData>
+        getWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest &windowRequest) {
+            return p->getWindow(windowRequest);
+        }
 
-    std::shared_ptr<struct WindowData> rectWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest &windowRequest, const CGRect &rect)
-    {
-        return p->rectWindow(windowRequest, rect);
-    }
-
-    std::shared_ptr<struct WindowData> topMostWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest &windowRequest)
-    {
-        return p->topMostWindow(windowRequest);
-    }
-
-    std::shared_ptr<struct WindowData> getWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest &windowRequest)
-    {
-        return p->getWindow(windowRequest);
-    }
-
-    void releaseFrontmostApplicationWrap(NSWorkspaceWrapperImpl *p, CFDictionaryRef query) { p->releaseFrontmostApplication(query); }
-} // namespace Screen_Capture
+        void releaseFrontmostApplicationWrap(NSWorkspaceWrapperImpl *p,
+                                             CFDictionaryRef query) { p->releaseFrontmostApplication(query); }
+    } // namespace Screen_Capture
 } // namespace SL
