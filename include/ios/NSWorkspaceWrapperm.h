@@ -16,4 +16,5 @@
 - (SCWindowData *)setRectWindow:(NSWindowDataRequest *)request:(CGRect)rect;
 
 - (SCWindowData *)topMostWindow:(NSWindowDataRequest *)request;
+- (SCWindowData *)getWindow:(NSWindowDataRequest *)request;
 @end

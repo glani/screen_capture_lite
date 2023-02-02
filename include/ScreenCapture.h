@@ -81,6 +81,7 @@ namespace Screen_Capture {
         bool Minimized;
         bool Fullscreen;
         bool RetrieveIcons;
+        bool ActiveFlag;
     };
 
     struct SC_LITE_EXTERN SearchAllWindowsRequest {
