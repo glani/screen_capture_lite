@@ -100,10 +100,10 @@ namespace Screen_Capture {
         bool retrieveIcon;
         std::map<std::string, std::string> icons;
     };
-    std::shared_ptr<std::vector<Window>> getWindows(const std::string &netRequestedAtom, bool retrieveIcon,
+    std::shared_ptr<std::vector<Window>> getWindows(XcbInitializer& xcbInstance, const std::string &netRequestedAtom, bool retrieveIcon,
                                                     const RetrieveWindowsConstraint &retrieve);
-    void addWindow(Display *display, XID &window, struct _WindowRequest wr, const AddWindowsCallback &callback);
-    pid_t determinePid(Display *display, XID &window);
+    void addWindow(XcbInitializer& xcbInstance, XID &window, struct _WindowRequest wr, const AddWindowsCallback &callback);
+    pid_t determinePid(XcbInitializer& xcbInstance, XID &window);
     int getExeForPid(pid_t pid, char *buf, size_t sz);
 
     bool getAtomList(Screen *screen, XID &window, Atom atom, Atom **atoms, int *len);
@@ -116,7 +116,8 @@ namespace Screen_Capture {
 
     std::shared_ptr<Window> GetActiveWindow(const SharedWindowsRequest &request)
     {
-        auto res = getWindows(std::string("_NET_ACTIVE_WINDOW"), request.RetrieveIcons, [&](const XID &id) { return true; });
+        XcbInitializer xcbInstance;
+        auto res = getWindows(xcbInstance, std::string("_NET_ACTIVE_WINDOW"), request.RetrieveIcons, [&](const XID &id) { return true; });
         if (!res->empty()) {
             return std::make_shared<Window>(res->front());
         }
@@ -127,7 +128,8 @@ namespace Screen_Capture {
 
     std::shared_ptr<Window> GetWindow(const SingleWindowRequest &request)
     {
-        auto res = getWindows(std::string("_NET_CLIENT_LIST"), request.RetrieveIcons,
+        XcbInitializer xcbInstance;
+        auto res = getWindows(xcbInstance, std::string("_NET_CLIENT_LIST"), request.RetrieveIcons,
                               [&](const XID &id) { return reinterpret_cast<XID>(request.Handle) == id; });
         if (!res->empty()) {
             return std::make_shared<Window>(res->front());
@@ -139,21 +141,22 @@ namespace Screen_Capture {
 
     std::shared_ptr<std::vector<Window>> GetWindows(const SearchAllWindowsRequest &request)
     {
-        return getWindows(std::string("_NET_CLIENT_LIST_STACKING"), request.RetrieveIcons, [&](const XID &id) { return true; });
+        XcbInitializer xcbInstance;
+        return getWindows(xcbInstance, std::string("_NET_CLIENT_LIST_STACKING"), request.RetrieveIcons, [&](const XID &id) { return true; });
     }
 
     // Make window full screen
     std::shared_ptr<Window> Fullscreen(const SingleWindowRequest &windowRequest, int display, bool fullscreen)
     {
         std::shared_ptr<Window> res;
-        auto &xcbInstance = XcbInitializer::getInstance();
+        XcbInitializer xcbInstance;
         if (xcbInstance.windowExists(windowRequest.Handle)) {
             xcbInstance.fullscreen(windowRequest.Handle, fullscreen);
             xcbInstance.flush();
             struct _WindowRequest wr;
             wr.retrieveIcon = windowRequest.Handle;
             XID window = static_cast<XID>(windowRequest.Handle);
-            addWindow(xcbInstance.xlibDisplay(), window, wr, [&](const Window &wnd) { res = std::make_shared<Window>(wnd); });
+            addWindow(xcbInstance, window, wr, [&](const Window &wnd) { res = std::make_shared<Window>(wnd); });
         }
         return res;
     }
@@ -162,14 +165,14 @@ namespace Screen_Capture {
     std::shared_ptr<Window> Minimize(const SingleWindowRequest &windowRequest, bool minimize)
     {
         std::shared_ptr<Window> res;
-        auto &xcbInstance = XcbInitializer::getInstance();
+        XcbInitializer xcbInstance;
         if (xcbInstance.windowExists(windowRequest.Handle)) {
             xcbInstance.minimize(windowRequest.Handle, minimize);
             xcbInstance.flush();
             struct _WindowRequest wr;
             wr.retrieveIcon = windowRequest.Handle;
             XID window = static_cast<XID>(windowRequest.Handle);
-            addWindow(xcbInstance.xlibDisplay(), window, wr, [&](const Window &wnd) { res = std::make_shared<Window>(wnd); });
+            addWindow(xcbInstance, window, wr, [&](const Window &wnd) { res = std::make_shared<Window>(wnd); });
         }
 
         return res;
@@ -179,14 +182,15 @@ namespace Screen_Capture {
     std::shared_ptr<Window> Maximize(const SingleWindowRequest &windowRequest, bool maximize)
     {
         std::shared_ptr<Window> res;
-        auto &xcbInstance = XcbInitializer::getInstance();
+        XcbInitializer xcbInstance;
+
         if (xcbInstance.windowExists(windowRequest.Handle)) {
             xcbInstance.maximize(windowRequest.Handle, maximize);
             xcbInstance.flush();
             struct _WindowRequest wr;
             wr.retrieveIcon = windowRequest.Handle;
             XID window = static_cast<XID>(windowRequest.Handle);
-            addWindow(xcbInstance.xlibDisplay(), window, wr, [&](const Window &wnd) { res = std::make_shared<Window>(wnd); });
+            addWindow(xcbInstance, window, wr, [&](const Window &wnd) { res = std::make_shared<Window>(wnd); });
         }
 
         return res;
@@ -196,14 +200,14 @@ namespace Screen_Capture {
     std::shared_ptr<Window> Visible(const SingleWindowRequest &windowRequest, bool visible)
     {
         std::shared_ptr<Window> res;
-        auto &xcbInstance = XcbInitializer::getInstance();
+        XcbInitializer xcbInstance;
         if (xcbInstance.windowExists(windowRequest.Handle)) {
             xcbInstance.visible(windowRequest.Handle, visible);
             xcbInstance.flush();
             struct _WindowRequest wr;
             wr.retrieveIcon = windowRequest.Handle;
             XID window = static_cast<XID>(windowRequest.Handle);
-            addWindow(xcbInstance.xlibDisplay(), window, wr, [&](const Window &wnd) { res = std::make_shared<Window>(wnd); });
+            addWindow(xcbInstance, window, wr, [&](const Window &wnd) { res = std::make_shared<Window>(wnd); });
         }
         return res;
     }
@@ -212,7 +216,7 @@ namespace Screen_Capture {
     std::shared_ptr<Window> Rectangle(const SingleWindowRequest &windowRequest, const Point &position, const SizeValues &size)
     {
         std::shared_ptr<Window> res;
-        auto &xcbInstance = XcbInitializer::getInstance();
+        XcbInitializer xcbInstance;
         if (xcbInstance.windowExists(windowRequest.Handle)) {
             xcbInstance.rectangle(windowRequest.Handle, position, size);
             xcbInstance.flush();
@@ -221,7 +225,7 @@ namespace Screen_Capture {
             wr.retrieveIcon = windowRequest.Handle;
 
             XID window = static_cast<XID>(windowRequest.Handle);
-            addWindow(xcbInstance.xlibDisplay(), window, wr, [&](const Window &wnd) { res = std::make_shared<Window>(wnd); });
+            addWindow(xcbInstance, window, wr, [&](const Window &wnd) { res = std::make_shared<Window>(wnd); });
         }
 
         return res;
@@ -231,7 +235,7 @@ namespace Screen_Capture {
     std::shared_ptr<Window> Topmost(const SingleWindowRequest &windowRequest)
     {
         std::shared_ptr<Window> res;
-        auto &xcbInstance = XcbInitializer::getInstance();
+        XcbInitializer xcbInstance;
         if (xcbInstance.windowExists(windowRequest.Handle)) {
             xcbInstance.visible(windowRequest.Handle, true);
             xcbInstance.activate(windowRequest.Handle);
@@ -241,7 +245,7 @@ namespace Screen_Capture {
             wr.retrieveIcon = windowRequest.Handle;
 
             XID window = static_cast<XID>(windowRequest.Handle);
-            addWindow(xcbInstance.xlibDisplay(), window, wr, [&](const Window &wnd) { res = std::make_shared<Window>(wnd); });
+            addWindow(xcbInstance, window, wr, [&](const Window &wnd) { res = std::make_shared<Window>(wnd); });
         }
 
         return res;
@@ -250,7 +254,8 @@ namespace Screen_Capture {
     std::shared_ptr<ShowingDesktopResult> ShowingDesktop(bool show)
     {
         std::shared_ptr<ShowingDesktopResult> res = std::make_shared<ShowingDesktopResult>();
-        auto &xcbInstance = XcbInitializer::getInstance();
+        XcbInitializer xcbInstance;
+//        auto &xcbInstance = XcbInitializer::getInstance();
         if (xcbInstance.showingDesktop(show)) {
             // TODO think
         }
@@ -263,11 +268,9 @@ namespace Screen_Capture {
 
     // helpers
 
-    std::shared_ptr<std::vector<Window>> getWindows(const std::string &netRequestedAtom, bool retrieveIcon, const RetrieveWindowsConstraint &retrieve)
+    std::shared_ptr<std::vector<Window>> getWindows(XcbInitializer& xcbInstance, const std::string &netRequestedAtom, bool retrieveIcon, const RetrieveWindowsConstraint &retrieve)
     {
         std::shared_ptr<std::vector<Window>> result = std::make_shared<std::vector<Window>>();
-
-        auto &xcbInstance = XcbInitializer::getInstance();
         auto display = xcbInstance.xlibDisplay();
 
         struct _WindowRequest wr;
@@ -285,7 +288,7 @@ namespace Screen_Capture {
             for (decltype(numItems) k = 0; k < numItems; k++) {
                 auto window = array[k];
                 if (retrieve(window)) {
-                    addWindow(display, window, wr, [&](const Window &wnd) { result->emplace_back(wnd); });
+                    addWindow(xcbInstance, window, wr, [&](const Window &wnd) { result->emplace_back(wnd); });
                 }
             }
             XFree(data);
@@ -293,15 +296,15 @@ namespace Screen_Capture {
         return result;
     }
 
-    void addWindow(Display *display, XID &window, struct _WindowRequest wr, const AddWindowsCallback &callback)
+    void addWindow(XcbInitializer& xcbInstance, XID &window, struct _WindowRequest wr, const AddWindowsCallback &callback)
     {
-        auto &xcbInstance = XcbInitializer::getInstance();
+        auto display = xcbInstance.xlibDisplay();
         Screen *screen = XDefaultScreenOfDisplay(display);
         pid_t ownerPid = 0;
         std::string exec;
 
         const int size = 2048;
-        ownerPid = determinePid(display, window);
+        ownerPid = determinePid(xcbInstance, window);
         auto buf = std::unique_ptr<char[]>(new char[size]);
         int len;
         if (-1 != (len = getExeForPid(ownerPid, buf.get(), size))) {
@@ -452,9 +455,9 @@ namespace Screen_Capture {
         }
     }
 
-    pid_t determinePid(Display *display, XID &window)
+    pid_t determinePid(XcbInitializer& xcbInstance, XID &window)
     {
-        auto &xcbInstance = XcbInitializer::getInstance();
+        auto display = xcbInstance.xlibDisplay();
         const auto atomPID = xcbInstance.atom(XcbAtom::_NET_WM_PID);
         struct FreeWrapRAII {
             void *data;

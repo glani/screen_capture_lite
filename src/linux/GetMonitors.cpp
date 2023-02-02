@@ -17,7 +17,7 @@ namespace Screen_Capture {
     {
         std::shared_ptr<std::vector<Monitor>> ret = std::make_shared<std::vector<Monitor>>();
 
-        auto &xcbInstance = XcbInitializer::getInstance();
+        XcbInitializer xcbInstance;
         auto display = xcbInstance.xlibDisplay();
         int nmonitors = 0;
         XineramaScreenInfo *queryScreens = XineramaQueryScreens(display, &nmonitors);

@@ -43,19 +43,16 @@ static int ioErrorHandler(Display *dpy)
     return _XDefaultIOError(dpy);
 }
 
-XcbInitializer::XcbInitializer() {}
+XcbInitializer::XcbInitializer() {
+    this->init();
+}
 
 XcbInitializer::~XcbInitializer()
 {
     if (isConnected()) {
         xcb_disconnect(xcbConnectionValue);
     }
-}
-
-XcbInitializer &XcbInitializer::getInstance()
-{
-    static XcbInitializer instance;
-    return instance;
+    XCloseDisplay(xlibDisplayValue);
 }
 
 void XcbInitializer::init()

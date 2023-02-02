@@ -34,7 +34,7 @@ struct StdFreeDeleter {
 //class XcbAtom::Atom;
 
 class XcbInitializer {
-  private:
+public:
     XcbInitializer();
 
     virtual ~XcbInitializer();
@@ -47,7 +47,7 @@ class XcbInitializer {
     bool isConnected() const { return xcbConnectionValue && !xcb_connection_has_error(xcbConnectionValue); }
     xcb_connection_t *xcbConnection() const { return xcbConnectionValue; }
 
-    static XcbInitializer &getInstance();
+//    static XcbInitializer &getInstance();
     XcbInitializer(XcbInitializer const &) = delete;
     void operator=(XcbInitializer const &) = delete;
 
