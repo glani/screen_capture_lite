@@ -285,6 +285,10 @@ namespace Screen_Capture {
     SC_LITE_EXTERN std::shared_ptr<Window> Minimize(const SingleWindowRequest &windowRequest, bool minimize);
     // Make window maximize
     SC_LITE_EXTERN std::shared_ptr<Window> Maximize(const SingleWindowRequest &windowRequest, bool maximize);
+
+    SC_LITE_EXTERN std::shared_ptr<Window> MaximizeHorz(const SingleWindowRequest &windowRequest, bool maximize);
+
+    SC_LITE_EXTERN std::shared_ptr<Window> MaximizeVert(const SingleWindowRequest &windowRequest, bool maximize);
     // Make window minimize
     SC_LITE_EXTERN std::shared_ptr<Window> Visible(const SingleWindowRequest &windowRequest, bool visible);
     // Set rectangle

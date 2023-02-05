@@ -281,6 +281,17 @@ int main(int arch, char **argv)
             return elem.ProcessName == reqApp
                 || elem.ProcessName == reqAppLowcase;
         });
+        auto fitTelegram = std::find_if(windows->begin(), windows->end(), [&](const SL::Screen_Capture::Window &elem) {
+            return elem.ProcessName == "Telegram"
+                   || elem.ProcessName == "Telegram";
+        });
+        if (fitTelegram != windows->end()) {
+            SL::Screen_Capture::SingleWindowRequest req = SL::Screen_Capture::WindowToWindowRequest(*fitTelegram);
+            SL::Screen_Capture::GetWindow(req);
+            SL::Screen_Capture::Topmost(req);
+            SL::Screen_Capture::MaximizeHorz(req, true);
+            SL::Screen_Capture::MaximizeHorz(req, false);
+        }
         if (fit != windows->end()) {
 
             SL::Screen_Capture::SingleWindowRequest req = SL::Screen_Capture::WindowToWindowRequest(*fit);
@@ -288,16 +299,20 @@ int main(int arch, char **argv)
             //            SL::Screen_Capture::Fullscreen(req, -1, false);
 //            SL::Screen_Capture::Visible(req, true);
 //           SL::Screen_Capture::Fullscreen(req, 0, true);
-           SL::Screen_Capture::Topmost(req);
-            SL::Screen_Capture::Rectangle(req, {req.Position.X + 100, req.Position.Y + 100}, req.Size);
-//            SL::Screen_Capture::Visible(req, false);
-//            SL::Screen_Capture::Visible(req, true);
-            SL::Screen_Capture::Minimize(req, true);
-            SL::Screen_Capture::Minimize(req, false);
-            SL::Screen_Capture::Maximize(req, true);
-            SL::Screen_Capture::Maximize(req, false);
-            SL::Screen_Capture::Fullscreen(req, -1, true);
             SL::Screen_Capture::Fullscreen(req, -1, false);
+//            SL::Screen_Capture::Rectangle(req, {req.Position.X + 100, req.Position.Y + 100}, {1200, 800});
+            SL::Screen_Capture::Rectangle(req, {200, req.Position.Y + 100}, {1200, 800});
+//            SL::Screen_Capture::Maximize(req, false);
+            SL::Screen_Capture::MaximizeVert(req, true);
+            SL::Screen_Capture::Topmost(req);
+////            SL::Screen_Capture::Visible(req, false);
+////            SL::Screen_Capture::Visible(req, true);
+//            SL::Screen_Capture::Minimize(req, true);
+//            SL::Screen_Capture::Minimize(req, false);
+//            SL::Screen_Capture::Maximize(req, true);
+//            SL::Screen_Capture::Maximize(req, false);
+//            SL::Screen_Capture::Fullscreen(req, -1, true);
+//            SL::Screen_Capture::Fullscreen(req, -1, false);
             //            SL::Screen_Capture::Minimize(req, true);
         }
 

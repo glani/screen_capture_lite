@@ -73,6 +73,10 @@ public:
 
     void maximize(const xcb_window_t &win, bool maximize);
 
+    void maximizeVert(const xcb_window_t &win, bool maximize);
+
+    void maximizeHorz(const xcb_window_t &win, bool maximize);
+
     void fullscreen(const xcb_window_t &win, bool fullscreen);
 
     bool showingDesktop(bool show);

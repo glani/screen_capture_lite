@@ -196,6 +196,42 @@ namespace Screen_Capture {
         return res;
     }
 
+    // Make window maximize Horz
+    std::shared_ptr<Window> MaximizeHorz(const SingleWindowRequest &windowRequest, bool maximize)
+    {
+        std::shared_ptr<Window> res;
+        XcbInitializer xcbInstance;
+
+        if (xcbInstance.windowExists(windowRequest.Handle)) {
+            xcbInstance.maximizeHorz(windowRequest.Handle, maximize);
+            xcbInstance.flush();
+            struct _WindowRequest wr;
+            wr.retrieveIcon = windowRequest.Handle;
+            XID window = static_cast<XID>(windowRequest.Handle);
+            addWindow(xcbInstance, window, wr, [&](const Window &wnd) { res = std::make_shared<Window>(wnd); });
+        }
+
+        return res;
+    }
+
+    // Make window maximize Vert
+    std::shared_ptr<Window> MaximizeVert(const SingleWindowRequest &windowRequest, bool maximize)
+    {
+        std::shared_ptr<Window> res;
+        XcbInitializer xcbInstance;
+
+        if (xcbInstance.windowExists(windowRequest.Handle)) {
+            xcbInstance.maximizeVert(windowRequest.Handle, maximize);
+            xcbInstance.flush();
+            struct _WindowRequest wr;
+            wr.retrieveIcon = windowRequest.Handle;
+            XID window = static_cast<XID>(windowRequest.Handle);
+            addWindow(xcbInstance, window, wr, [&](const Window &wnd) { res = std::make_shared<Window>(wnd); });
+        }
+
+        return res;
+    }
+
     // Make window visible
     std::shared_ptr<Window> Visible(const SingleWindowRequest &windowRequest, bool visible)
     {
