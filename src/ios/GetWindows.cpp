@@ -31,6 +31,18 @@ namespace SL {
             return nullptr;
         }
 
+        std::shared_ptr<Window> MaximizeHorz(const SingleWindowRequest &windowRequest, bool maximize) {
+            // not supported
+            // should be calculated as a  fake fullscreen
+            return nullptr;
+        }
+
+        std::shared_ptr<Window> MaximizeVert(const SingleWindowRequest &windowRequest, bool maximize) {
+            // not supported
+            // should be calculated as a  fake fullscreen
+            return nullptr;
+        }
+
         // Make window minimize
         std::shared_ptr<Window> Visible(const SingleWindowRequest &windowRequest, bool visible) {
             std::shared_ptr<Window> windowPtr;
