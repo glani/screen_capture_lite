@@ -372,18 +372,13 @@ namespace SL {
 
             std::shared_ptr<struct NativeWindowData> nativeWindowInfo(char* data, size_t sz) {
                 auto res = std::make_shared<struct NativeWindowData>((NativeWindowData){});
-//                NSView* view = *reinterpret_cast<NSView**>(data);
-//                uint64_t addr = *((uint64_t*)data);
-//                void* nsViewAddr = (void*)addr;
-//                std::cout << addr << std::endl;
-//                NSView* view = reinterpret_cast<NSView*>(nsViewAddr);
-//                NSWindow *window = [view window];
-//                if (window) {
-//                    res->handle = [window windowNumber];
-//                } else {
-//
-//                }
-                res->handle = 0;
+                NSView* view = *reinterpret_cast<NSView**>(data);
+                NSWindow *window = [view window];
+                if (window) {
+                    res->handle = [window windowNumber];
+                } else {
+                    res->handle = 0;
+                }
                 res->pid = 0;
                 return res;
             }

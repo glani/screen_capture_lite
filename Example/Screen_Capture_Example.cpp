@@ -264,10 +264,12 @@ int main(int arch, char **argv)
 
 
     SL::Screen_Capture::SingleWindowRequest req1;
-    req1.Handle = 587;
-    req1.OwnerHandle = 6512;
+    req1.Handle = 5026;
+    req1.OwnerHandle = 80536;
+//    { OwnerHandle: , Handle:  }
+
 //    auto res = SL::Screen_Capture::Fullscreen(req1, -1, false);
-    auto res = SL::Screen_Capture::Activate(req1);
+    auto res = SL::Screen_Capture::Topmost(req1);
 
 
 
