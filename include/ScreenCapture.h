@@ -73,6 +73,11 @@ namespace Screen_Capture {
         std::vector<WindowAttribute> Attributes;
     };
 
+    struct SC_LITE_EXTERN NativeWindow {
+        size_t Handle;
+        size_t OwnerHandle;
+    };
+
     struct SC_LITE_EXTERN SingleWindowRequest {
         size_t Handle;
         size_t OwnerHandle;
@@ -295,6 +300,12 @@ namespace Screen_Capture {
     SC_LITE_EXTERN std::shared_ptr<Window> Rectangle(const SingleWindowRequest &windowRequest, const Point &position, const SizeValues &size);
     // Make window top most
     SC_LITE_EXTERN std::shared_ptr<Window> Topmost(const SingleWindowRequest &windowRequest);
+    // Activate window
+    SC_LITE_EXTERN std::shared_ptr<Window> Activate(const SingleWindowRequest &windowRequest);
+
+    // Native window info
+    SC_LITE_EXTERN std::shared_ptr<NativeWindow> NativeWindowInfo(char* data, const size_t sz);
+
     // will return active window
     SC_LITE_EXTERN std::shared_ptr<Window> GetActiveWindow(const SharedWindowsRequest &request);
     // will return requested window

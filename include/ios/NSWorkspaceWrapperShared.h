@@ -22,6 +22,12 @@ namespace Screen_Capture {
         std::shared_ptr<std::string> execute;
         std::shared_ptr<std::string> icon;
     };
+
+    struct NativeWindowData {
+        int pid;
+        uint32_t handle;
+    };
+
     struct ScreenData {
         CGRect frame;
         CGRect visibleFrame;

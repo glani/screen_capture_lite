@@ -260,6 +260,17 @@ void createwindowgrabber()
 int main(int arch, char **argv)
 {
     SL::Screen_Capture::InitWindows();
+
+
+
+    SL::Screen_Capture::SingleWindowRequest req1;
+    req1.Handle = 587;
+    req1.OwnerHandle = 6512;
+//    auto res = SL::Screen_Capture::Fullscreen(req1, -1, false);
+    auto res = SL::Screen_Capture::Activate(req1);
+
+
+
     SL::Screen_Capture::SharedWindowsRequest gar;
     gar.RetrieveIcons = true;
     auto activeWindow = SL::Screen_Capture::GetActiveWindow(gar);
@@ -301,19 +312,21 @@ int main(int arch, char **argv)
 //           SL::Screen_Capture::Fullscreen(req, 0, true);
             SL::Screen_Capture::Fullscreen(req, -1, false);
 //            SL::Screen_Capture::Rectangle(req, {req.Position.X + 100, req.Position.Y + 100}, {1200, 800});
-            SL::Screen_Capture::Rectangle(req, {200, req.Position.Y + 100}, {1200, 800});
+//            SL::Screen_Capture::Rectangle(req, {100, req.Position.Y + 100}, {1200, 800});
+            auto m1 = monitors->at(1);
+            SL::Screen_Capture::Rectangle(req, {m1.VisibleFrame.X, m1.VisibleFrame.Y + 12}, {m1.VisibleFrame.Width, m1.VisibleFrame.Height});
 //            SL::Screen_Capture::Maximize(req, false);
-            SL::Screen_Capture::MaximizeVert(req, true);
-            SL::Screen_Capture::Topmost(req);
+//            SL::Screen_Capture::MaximizeVert(req, true);
+//            SL::Screen_Capture::Topmost(req);
 ////            SL::Screen_Capture::Visible(req, false);
 ////            SL::Screen_Capture::Visible(req, true);
 //            SL::Screen_Capture::Minimize(req, true);
 //            SL::Screen_Capture::Minimize(req, false);
 //            SL::Screen_Capture::Maximize(req, true);
 //            SL::Screen_Capture::Maximize(req, false);
-//            SL::Screen_Capture::Fullscreen(req, -1, true);
-//            SL::Screen_Capture::Fullscreen(req, -1, false);
-            //            SL::Screen_Capture::Minimize(req, true);
+            SL::Screen_Capture::Fullscreen(req, -1, true);
+            auto res = SL::Screen_Capture::Fullscreen(req, -1, false);
+            SL::Screen_Capture::Minimize(req, true);
         }
 
         if (!windows->empty()) {

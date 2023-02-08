@@ -48,6 +48,14 @@ namespace SL {
             return topMostWindowWrap(this->NSWorkspaceWrapperImpl_, windowRequest);
         }
 
+        std::shared_ptr<struct WindowData> NSWorkspaceWrapper::activate(const WindowDataRequest &windowRequest) {
+            return activateWindowWrap(this->NSWorkspaceWrapperImpl_, windowRequest);
+        }
+
+        std::shared_ptr<struct NativeWindowData> NSWorkspaceWrapper::nativeWindowInfo(char* data, size_t sz) {
+            return nativeWindowInfoWrap(this->NSWorkspaceWrapperImpl_, data, sz);
+        }
+
         std::shared_ptr<struct WindowData>
         NSWorkspaceWrapper::rectWindow(const WindowDataRequest &windowRequest, const CGRect &rect) {
             return rectWindowWrap(this->NSWorkspaceWrapperImpl_, windowRequest, rect);

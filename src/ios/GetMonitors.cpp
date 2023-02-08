@@ -23,7 +23,8 @@ namespace Screen_Capture {
             unsigned int display = displays[i];
             if (CGDisplayMirrorsDisplay(display) == kCGNullDirectDisplay) {
                 auto fit = std::find_if(screens->begin(), screens->end(), [&](const ScreenData &elem) { return elem.displayId == display; });
-                if (fit != screens->end()) {
+                auto fitMain = std::find_if(screens->begin(), screens->end(), [&](const ScreenData &elem) { return elem.main; });
+                if (fit != screens->end() && fitMain != screens->end()) {
                     auto dismode = CGDisplayCopyDisplayMode(display);
                     auto width = CGDisplayModeGetPixelWidth(dismode);
                     auto height = CGDisplayModeGetPixelHeight(dismode);
@@ -48,6 +49,15 @@ namespace Screen_Capture {
                     monitor.Frame.Width = int(fit->frame.size.width);
                     monitor.Frame.Height = int(fit->frame.size.height);
                     monitor.Main = fit->main;
+                    if (fit->main) {
+                        monitor.VisibleFrame.Y = std::max(monitor.Frame.Height - monitor.VisibleFrame.Height - monitor.VisibleFrame.Y, 0); // no top place for dock
+                    } else {
+                        monitor.Frame.X = monitor.OffsetX;
+                        monitor.Frame.Y = monitor.OffsetY;
+                        monitor.VisibleFrame.X = monitor.OffsetX;
+                        monitor.VisibleFrame.Y = monitor.OffsetY + std::max(int(fitMain->frame.size.height - fitMain->visibleFrame.size.height - fitMain->visibleFrame.origin.y), 0);
+                        monitor.VisibleFrame.Height -= monitor.VisibleFrame.Y;
+                    }
 
                     ret->emplace_back(monitor);
                 }
