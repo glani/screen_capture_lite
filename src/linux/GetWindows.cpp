@@ -445,6 +445,16 @@ namespace Screen_Capture {
                 attributeMaximized.Code = std::string(S_RES_MAXIMIZED);
                 attributeMaximized.Value = (maxVert && maxHorz) ? std::string(S_TRUE) : std::string(S_FALSE);
                 w.Attributes.emplace_back(attributeMaximized);
+
+                WindowAttribute attributeMaximizedHorz;
+                attributeMaximizedHorz.Code = std::string(S_RES_MAXIMIZED_HORZ);
+                attributeMaximizedHorz.Value = (maxHorz) ? std::string(S_TRUE) : std::string(S_FALSE);
+                w.Attributes.emplace_back(attributeMaximizedHorz);
+
+                WindowAttribute attributeMaximizedVert;
+                attributeMaximizedVert.Code = std::string(S_RES_MAXIMIZED_VERT);
+                attributeMaximizedVert.Value = (maxVert) ? std::string(S_TRUE) : std::string(S_FALSE);
+                w.Attributes.emplace_back(attributeMaximizedVert);
             }
             if (atoms) {
                 XFree(atoms);
