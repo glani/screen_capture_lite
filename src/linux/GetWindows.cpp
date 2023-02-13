@@ -74,18 +74,17 @@ auto GetWMIconName(Display *display, Window window)
 auto TextPropertyToStrings(Display *dpy, const XTextProperty &prop)
 {
     auto result = std::vector<std::string>{};
-
-    auto datalen = (int)prop.nitems;
-
-    int elemStart = 0;
-    char *cp = (char *)prop.value;
-    for (int i = datalen; i >= 0; cp++, i--) {
-        if (*cp == '\0') {
-            int len = datalen - i - elemStart;
-            std::string s1((char *)(prop.value + elemStart), len);
-            result.emplace_back(s1);
-            elemStart = datalen - i + 1;
+    char **retList = nullptr;
+    int retListLength = -1;
+    int ret = Xutf8TextPropertyToTextList(dpy, &prop, &retList, &retListLength);
+    if(ret == Success && retListLength > 0) {
+        for (int i = 0; i < retListLength; i++) {
+            std::string s(retList[i]);
+            result.emplace_back(s);
         }
+    }
+    if (retList) {
+        free(*retList);
     }
 
     return result;
@@ -265,6 +264,18 @@ namespace Screen_Capture {
         }
 
         return res;
+    }
+
+    std::shared_ptr<NativeWindow> NativeWindowInfo(char* data, const size_t sz) {
+        NativeWindow windowInfo;
+        u_int32_t* wId = (u_int32_t *)data;
+        windowInfo.Handle = *wId;
+        windowInfo.OwnerHandle = -1;
+        return std::make_shared<NativeWindow>(windowInfo);
+    }
+
+    std::shared_ptr<Window> Activate(const SingleWindowRequest &windowRequest) {
+        return Topmost(windowRequest);
     }
 
     // Make window top most

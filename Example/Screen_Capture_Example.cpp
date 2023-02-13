@@ -300,7 +300,7 @@ int main(int arch, char **argv)
         });
         if (fitTelegram != windows->end()) {
             SL::Screen_Capture::SingleWindowRequest req = SL::Screen_Capture::WindowToWindowRequest(*fitTelegram);
-            SL::Screen_Capture::GetWindow(req);
+            auto t = SL::Screen_Capture::GetWindow(req);
             SL::Screen_Capture::Topmost(req);
             SL::Screen_Capture::MaximizeHorz(req, true);
             SL::Screen_Capture::MaximizeHorz(req, false);
