@@ -368,6 +368,9 @@ int main(int arch, char **argv)
         std::cout << m << std::endl;
         assert(SL::Screen_Capture::isMonitorInsideBounds(*goodmonitors, m));
     }
+    if (!goodmonitors->empty()) {
+        exit(1);
+    }
     auto badmonitors = SL::Screen_Capture::GetMonitors();
 
     for (auto m : *badmonitors) {
