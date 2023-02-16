@@ -99,6 +99,11 @@ ElementGetWindowID elementGetWindowID = stubAXUIElementGetWindow;
     return self;
 }
 
+- (uint64_t)uxElement {
+    AXUIElementRef v = CFRetain(_underlyingElement);
+    return (uint64_t)*(uint64_t**)&v;
+}
+
 + (SCAccessibilityElement *)frontmostApplicationElement {
     NSRunningApplication *frontmostApplication = [NSWorkspace sharedWorkspace].frontmostApplication;
     pid_t pid = frontmostApplication.processIdentifier;
@@ -331,12 +336,42 @@ ElementGetWindowID elementGetWindowID = stubAXUIElementGetWindow;
     @autoreleasepool {
         CFTypeRef value;
         AXError result;
+        CFTypeRef value1;
+        result = AXUIElementCopyAttributeNames(_underlyingElement, &value1);
+//        result = AXUIElementCopyAttributeValue(_underlyingElement, @"AXHidden", &value);
+//        result = AXUIElementCopyAttributeValue(_underlyingElement, @"AXSize", &value);
+//        result = AXUIElementCopyAttributeValue(_underlyingElement, @"AXPosition", &value);
+//        result = AXUIElementCopyAttributeValue(_underlyingElement, kAXWindowAttribute, &value);
+        result = AXUIElementCopyAttributeValue(_underlyingElement, @"AXChildren", &value);
+        NSArray *childrenLst = (NSArray *) value;
+        for (id elem in childrenLst) {
+            result = AXUIElementCopyAttributeValue(elem, kAXWindowAttribute, &value);
+            result = AXUIElementCopyAttributeValue(elem, kAXTitleAttribute, &value);
+        }
+
+        result = AXUIElementCopyAttributeValues(_underlyingElement, kAXWindowsAttribute, 0, 9999, &value);
         result = AXUIElementCopyAttributeValue(_underlyingElement, kAXWindowsAttribute, &value);
+//        [AXUIElementRef isActualWindow:]
         if (result == kAXErrorSuccess) {
             NSArray *windowsLst = (NSArray *) value;
 
             NSMutableArray *res = [[NSMutableArray alloc] init];
+//            if ([windowsLst count] == 0) {
+//                CFTypeRef valueMainWindow;
+//                CFTypeRef valueFocusWindow;
+//                AXError resultWorkAround;
+//                resultWorkAround = AXUIElementCopyAttributeValue(_underlyingElement, kAXMainWindowAttribute, &value);
+//                if (result == kAXErrorSuccess) {
+//                    result = AXUIElementCopyAttributeValue(_underlyingElement, @"AXMainWindow", &value);
+//                }
+//                    resultWorkAround = AXUIElementCopyAttributeValue(_underlyingElement, kAXFocusedWindowAttribute, &value);
+//
+//                resultWorkAround = AXUIElementCopyAttributeValue(_underlyingElement, , &value);
+//
+//            }
+//            windowsLst pu
             for (id elem in windowsLst) {
+                result = AXUIElementCopyAttributeValue(elem, kAXWindowAttribute, &value);
                 SCAccessibilityElement *accessibilityElement = [SCAccessibilityElement new];
                 accessibilityElement.underlyingElement = elem;
                 [res addObject:accessibilityElement];

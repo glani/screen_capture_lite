@@ -89,27 +89,27 @@ namespace SL {
 
         std::shared_ptr<std::vector<Window>> GetWindows(const SearchAllWindowsRequest &request) {
             auto windows = ptrWrapper.determineWindows(request.RetrieveIcons);
-//            int option = kCGWindowListExcludeDesktopElements | kCGWindowListOptionOnScreenOnly;
-//            auto windowList = CGWindowListCopyWindowInfo(option, kCGNullWindowID);
-//            std::map<uint32_t, std::vector<uint32_t>> processToIndex;
-//            CFIndex numWindows = CFArrayGetCount(windowList);
-//            for (uint32_t i = 0; i < numWindows; i++) {
-//                auto dict = static_cast<CFDictionaryRef>(CFArrayGetValueAtIndex(windowList, i));
-//                if (dict != NULL) {
-//                    auto windowOwnerPID = static_cast<CFNumberRef>(CFDictionaryGetValue(dict, kCGWindowOwnerPID));
-//                    uint32_t windowPid;
-//
-//                    if (windowOwnerPID != NULL && CFNumberGetValue(windowOwnerPID, kCFNumberIntType, &windowPid)) {
-//                        auto ownerHandle = static_cast<size_t>( windowPid);
-//                        auto it = processToIndex.find(ownerHandle);
-//                        if (it == processToIndex.end()) {
-//                            auto iit = processToIndex.emplace(ownerHandle, std::vector<uint32_t>());
-//                            it = iit.first;
-//                        }
-//                        it->second.emplace_back(i);
-//                    }
-//                }
-//            }
+            int option = kCGWindowListExcludeDesktopElements;
+            auto windowList = CGWindowListCopyWindowInfo(option, kCGNullWindowID);
+            std::map<uint32_t, std::vector<uint32_t>> processToIndex;
+            CFIndex numWindows = CFArrayGetCount(windowList);
+            for (uint32_t i = 0; i < numWindows; i++) {
+                auto dict = static_cast<CFDictionaryRef>(CFArrayGetValueAtIndex(windowList, i));
+                if (dict != NULL) {
+                    auto windowOwnerPID = static_cast<CFNumberRef>(CFDictionaryGetValue(dict, kCGWindowOwnerPID));
+                    uint32_t windowPid;
+
+                    if (windowOwnerPID != NULL && CFNumberGetValue(windowOwnerPID, kCFNumberIntType, &windowPid)) {
+                        auto ownerHandle = static_cast<size_t>( windowPid);
+                        auto it = processToIndex.find(ownerHandle);
+                        if (it == processToIndex.end()) {
+                            auto iit = processToIndex.emplace(ownerHandle, std::vector<uint32_t>());
+                            it = iit.first;
+                        }
+                        it->second.emplace_back(i);
+                    }
+                }
+            }
 
             std::shared_ptr<std::vector<Window>> ret = std::make_shared<std::vector<Window>>();
 

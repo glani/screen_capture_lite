@@ -13,6 +13,7 @@
 @interface SCWindowData : NSObject
 @property(nonatomic) CFStringRef processTitle;
 @property(nonatomic) int pid;
+@property(nonatomic) uint64_t addrId;
 @property(nonatomic) CFStringRef title;
 @property(nonatomic) CGRect rect;
 @property(nonatomic) uint32_t handle;
@@ -45,6 +46,7 @@
 
 - (CGRect)rectOfElement;
 - (void)setRectOfElement:(CGRect)rect;
+- (uint64_t)uxElement;
 
 + (CGRect)normalizeCoordinatesOfRect:(CGRect)rect frameOfScreen:(CGRect)frameOfScreen;
 

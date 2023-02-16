@@ -93,6 +93,7 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
         window.processTitle = nil;
     }
     [element enrich:window];
+    window.addrId = [element uxElement];
     return window;
 }
 
@@ -270,6 +271,11 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
         }
         [windowsElement release];
     }
+    uint64_t  id = res.addrId;
+    AXUIElementRef view = reinterpret_cast<AXUIElementRef>(id);
+    CFTypeRef sizeValue;
+344e4e3eeww2edw    AXError result = AXUIElementCopyAttributeValue(view, kAXTitleAttribute, (CFTypeRef *) &sizeValue);
+    CFRelease(view);
     return res;
 }
 @end
