@@ -39,6 +39,7 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
         [appsArray release];
 #else
         NSMutableSet *pidSet = [[NSMutableSet alloc] init];
+//        auto windowList = CGWindowListCopyWindowInfo(kCGWindowListOptionAll, kCGNullWindowID);
         auto windowList = CGWindowListCopyWindowInfo(kCGWindowListExcludeDesktopElements, kCGNullWindowID);
         CFIndex numWindows = CFArrayGetCount(windowList);
         for (int i = 0; i < (int) numWindows; i++) {
