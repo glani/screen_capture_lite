@@ -57,5 +57,6 @@
 - (void)enrich:(SCWindowData *)window;
 - (void)fullscreenWindow:(bool)fullscreen;
 - (void)minimizeWindow:(bool)minimize;
+- (BOOL)closeWindow:(bool)force;
 - (void)topMostWindow;
 @end

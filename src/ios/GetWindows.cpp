@@ -56,9 +56,9 @@ namespace SL {
             return windowPtr;
         }
 
-        std::shared_ptr<Window> GetWindow(const SingleWindowRequest &windowRequests) {
+        std::shared_ptr<Window> GetWindow(const SingleWindowRequest &windowReques) {
             std::shared_ptr<Window> windowPtr;
-            std::shared_ptr<WindowData> window = ptrWrapper.getWindow(*windowDataRequest(windowRequests));
+            std::shared_ptr<WindowData> window = ptrWrapper.getWindow(*windowDataRequest(windowReques));
             if (window) {
                 std::shared_ptr<std::vector<SL::Screen_Capture::Monitor>> monitors; //(GetMonitors());
                 windowPtr = getWindow(window.get(), monitors);
@@ -142,9 +142,9 @@ namespace SL {
             return ret;
         }
 
-        std::shared_ptr<Window> Topmost(const SingleWindowRequest &windowRequests) {
+        std::shared_ptr<Window> Topmost(const SingleWindowRequest &windowReques) {
             std::shared_ptr<Window> windowPtr;
-            std::shared_ptr<WindowData> window = ptrWrapper.topMost(*windowDataRequest(windowRequests));
+            std::shared_ptr<WindowData> window = ptrWrapper.topMost(*windowDataRequest(windowReques));
             if (window) {
                 std::shared_ptr<std::vector<SL::Screen_Capture::Monitor>> monitors; //(GetMonitors());
                 windowPtr = getWindow(window.get(), monitors);
@@ -153,15 +153,35 @@ namespace SL {
             return windowPtr;
         }
 
-        std::shared_ptr<Window> Activate(const SingleWindowRequest &windowRequests) {
+        std::shared_ptr<Window> Activate(const SingleWindowRequest &windowReques) {
             std::shared_ptr<Window> windowPtr;
-            std::shared_ptr<WindowData> window = ptrWrapper.activate(*windowDataRequest(windowRequests));
+            std::shared_ptr<WindowData> window = ptrWrapper.activate(*windowDataRequest(windowReques));
             if (window) {
                 std::shared_ptr<std::vector<SL::Screen_Capture::Monitor>> monitors; //(GetMonitors());
                 windowPtr = getWindow(window.get(), monitors);
             }
 
             return windowPtr;
+        }
+
+        std::shared_ptr<EmptyResult> CloseAllWindows(const SingleWindowRequest &windowRequest, bool force) {
+            std::shared_ptr<EmptyResult> resultPtr;
+            bool res = ptrWrapper.closeAllWindows(*windowDataRequest(windowRequest), force);
+            if (res) {
+                resultPtr = std::make_shared<EmptyResult>();
+            }
+
+            return resultPtr;
+        }
+
+        std::shared_ptr<EmptyResult> CloseWindow(const SingleWindowRequest &windowRequest, bool force) {
+            std::shared_ptr<EmptyResult> resultPtr;
+            bool res = ptrWrapper.closeWindow(*windowDataRequest(windowRequest), force);
+            if (res) {
+                resultPtr = std::make_shared<EmptyResult>();
+            }
+
+            return resultPtr;
         }
 
         std::shared_ptr<NativeWindow> NativeWindowInfo(char *data, const size_t sz) {
@@ -177,9 +197,9 @@ namespace SL {
             return windowPtr;
         }
 
-        std::shared_ptr<Window> Fullscreen(const SingleWindowRequest &windowRequests, int display, bool fullscreen) {
+        std::shared_ptr<Window> Fullscreen(const SingleWindowRequest &windowReques, int display, bool fullscreen) {
             std::shared_ptr<Window> windowPtr;
-            std::shared_ptr<WindowData> window = ptrWrapper.fullscreen(*windowDataRequest(windowRequests), display,
+            std::shared_ptr<WindowData> window = ptrWrapper.fullscreen(*windowDataRequest(windowReques), display,
                                                                        fullscreen);
             if (window) {
                 std::shared_ptr<std::vector<SL::Screen_Capture::Monitor>> monitors; //(GetMonitors());
@@ -190,13 +210,13 @@ namespace SL {
         }
 
         std::shared_ptr<Window>
-        Rectangle(const SingleWindowRequest &windowRequests, const Point &position, const SizeValues &size) {
+        Rectangle(const SingleWindowRequest &windowReques, const Point &position, const SizeValues &size) {
             std::shared_ptr<Window> windowPtr;
             CGRect rect = {
                     {static_cast<float>(position.X), static_cast<float>(position.Y)},
                     {static_cast<float>(size.Width), static_cast<float>(size.Height)}
             };
-            std::shared_ptr<WindowData> window = ptrWrapper.rectWindow(*windowDataRequest(windowRequests), rect);
+            std::shared_ptr<WindowData> window = ptrWrapper.rectWindow(*windowDataRequest(windowReques), rect);
             if (window) {
                 std::shared_ptr<std::vector<SL::Screen_Capture::Monitor>> monitors; //(GetMonitors());
                 windowPtr = getWindow(window.get(), monitors);

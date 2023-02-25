@@ -22,6 +22,9 @@ namespace Screen_Capture {
     std::shared_ptr<std::vector<struct WindowData>> determineWindowsWrap(NSWorkspaceWrapperImpl *p, bool retrieveIcon);
 
     std::shared_ptr<struct WindowData> minimizeWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest& windowRequest, bool minimize);
+    bool closeWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest& windowRequest, bool force);
+    bool closeAllWindowsWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest& windowRequest, bool force);
+
     std::shared_ptr<struct WindowData> fullscreenWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest& windowRequest, int display, bool fullscreen);
     std::shared_ptr<struct WindowData> rectWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest& windowRequest, const CGRect& rect);
     std::shared_ptr<struct WindowData> topMostWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest& windowRequest);
@@ -48,6 +51,9 @@ namespace Screen_Capture {
         std::shared_ptr<std::vector<struct WindowData>> determineWindows(bool retrieveIcon);
 
         std::shared_ptr<struct WindowData> minimize(const WindowDataRequest& windowRequest, bool minimize);
+        bool closeWindow(const WindowDataRequest &windowRequest, bool force);
+        bool closeAllWindows(const WindowDataRequest &windowRequest, bool force);
+
         std::shared_ptr<struct WindowData> fullscreen(const WindowDataRequest& windowRequest, int display, bool fullscreen);
         std::shared_ptr<struct WindowData> rectWindow(const WindowDataRequest& windowRequest, const CGRect& rect);
         std::shared_ptr<struct WindowData> topMost(const WindowDataRequest& windowRequest);

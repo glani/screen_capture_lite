@@ -35,6 +35,14 @@ namespace SL {
             return minimizeWindowWrap(this->NSWorkspaceWrapperImpl_, windowRequest, minimize);
         }
 
+        bool NSWorkspaceWrapper::closeWindow(const WindowDataRequest &windowRequest, bool force) {
+            return closeWindowWrap(this->NSWorkspaceWrapperImpl_, windowRequest, force);
+        }
+
+        bool NSWorkspaceWrapper::closeAllWindows(const WindowDataRequest &windowRequest, bool force) {
+            return closeAllWindowsWrap(this->NSWorkspaceWrapperImpl_, windowRequest, force);
+        }
+
         std::shared_ptr<struct WindowData>
         NSWorkspaceWrapper::fullscreen(const WindowDataRequest &windowRequest, int display, bool fullscreen) {
             return fullscreenWindowWrap(this->NSWorkspaceWrapperImpl_, windowRequest, display, fullscreen);

@@ -155,6 +155,8 @@ namespace Screen_Capture {
 
     struct SC_LITE_EXTERN ShowingDesktopResult {};
 
+    struct SC_LITE_EXTERN EmptyResult {};
+
     struct SC_LITE_EXTERN Monitor {
         int Id = INT32_MAX;
         int Index = INT32_MAX;
@@ -296,6 +298,13 @@ namespace Screen_Capture {
     SC_LITE_EXTERN std::shared_ptr<Window> MaximizeVert(const SingleWindowRequest &windowRequest, bool maximize);
     // Make window minimize
     SC_LITE_EXTERN std::shared_ptr<Window> Visible(const SingleWindowRequest &windowRequest, bool visible);
+
+    // Close all windows / terminate application
+    SC_LITE_EXTERN std::shared_ptr<EmptyResult> CloseAllWindows(const SingleWindowRequest &windowRequest, bool force);
+
+    // Close window
+    SC_LITE_EXTERN std::shared_ptr<EmptyResult> CloseWindow(const SingleWindowRequest &windowRequest, bool force);
+
     // Set rectangle
     SC_LITE_EXTERN std::shared_ptr<Window> Rectangle(const SingleWindowRequest &windowRequest, const Point &position, const SizeValues &size);
     // Make window top most

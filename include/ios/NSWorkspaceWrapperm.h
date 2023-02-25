@@ -15,6 +15,7 @@
 - (SCWindowData *)fullscreenWindow:(NSWindowDataRequest *)request:(int)display:(bool)fullscreen;
 - (SCWindowData *)setRectWindow:(NSWindowDataRequest *)request:(CGRect)rect;
 
+- (bool)closeWindow:(NSWindowDataRequest *)request:(bool)force;
 - (SCWindowData *)topMostWindow:(NSWindowDataRequest *)request;
 - (SCWindowData *)getWindow:(NSWindowDataRequest *)request;
 @end

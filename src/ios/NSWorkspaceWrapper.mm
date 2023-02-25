@@ -228,6 +228,29 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
     return res;
 }
 
+- (bool)closeWindow:(NSWindowDataRequest *)request:(bool)force {
+    int pid = [request pid];
+    auto appElement = [SCAccessibilityElement createApplicationElement:pid];
+    if (appElement) {
+        SCAccessibilityElementWindows *windowsElement = [appElement retrieveAllWindows];
+        SCAccessibilityElement *windowRes = nil;
+        NSArray *windowsList = [windowsElement getWindowsList];
+        for (SCAccessibilityElement *window in windowsList) {
+            if ([window determineRequiredWindow:request :[windowsList count] == 1]) {
+                windowRes = window;
+                break;
+            }
+        }
+        bool res = false;
+        if (windowRes) {
+            res = [windowRes closeWindow:force];
+        }
+        [windowsElement release];
+        return res;
+    }
+    return false;
+}
+
 - (SCWindowData *)topMostWindow:(NSWindowDataRequest *)request {
     SCWindowData *res = nil;
     int pid = [request pid];
@@ -409,6 +432,31 @@ namespace SL {
                     }
                 }
                 return nullptr;
+            }
+
+            bool closeWindow(const WindowDataRequest& windowRequest, bool force) {
+                int pid = windowRequest.pid;
+                auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
+                if (application) {
+                    NSWindowDataRequest *windowDataRequest = createNSWindowDataRequest(windowRequest);
+                    bool res = [ptr closeWindow:windowDataRequest:force];
+                    [windowDataRequest release];
+                    return res;
+                }
+                return false;
+            }
+
+            bool closeAllWindows(const WindowDataRequest& windowRequest, bool force) {
+                int pid = windowRequest.pid;
+                auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
+                if (application) {
+                    if (force) {
+                        return [application forceTerminate];
+                    } else {
+                        return [application terminate];
+                    }
+                }
+                return false;
             }
 
             std::shared_ptr<struct WindowData> activateWindow(const WindowDataRequest &windowRequest) {
@@ -692,6 +740,15 @@ namespace SL {
         rectWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest &windowRequest, const CGRect &rect) {
             return p->rectWindow(windowRequest, rect);
         }
+
+        bool closeWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest& windowRequest, bool force) {
+            return p->closeWindow(windowRequest, force);
+        }
+
+        bool closeAllWindowsWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest& windowRequest, bool force) {
+            return p->closeAllWindows(windowRequest, force);
+        }
+
 
         std::shared_ptr<struct WindowData>
         topMostWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest &windowRequest) {

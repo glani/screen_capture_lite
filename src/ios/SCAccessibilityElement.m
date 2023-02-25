@@ -390,6 +390,18 @@ ElementGetWindowID elementGetWindowID = stubAXUIElementGetWindow;
     [self setValue:minimizeRef forAttribute:kAXMinimizedAttribute];
 }
 
+- (BOOL)closeWindow:(bool)force {
+    CFTypeRef value = [self valueOfAttribute:kAXCloseButtonAttribute type:kAXValueTypeIllegal];
+    if (value) {
+        AXUIElementRef closeButton = (AXUIElementRef)value;
+        AXUIElementPerformAction(closeButton, kAXPressAction);
+        CFRelease(value);
+        return TRUE;
+    } else {
+        return FALSE;
+    }
+}
+
 - (void)topMostWindow {
     [self setValue:kCFBooleanTrue forAttribute:(__bridge CFStringRef) NSAccessibilityMainAttribute];
 }
