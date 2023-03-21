@@ -38,7 +38,7 @@
 - (SCAccessibilityElement *)elementWithAttribute:(CFStringRef)attribute;
 
 - (NSString *)stringValueOfAttribute:(CFStringRef)attribute;
-- (CFBooleanRef)booleanValueOfAttribute:(CFStringRef)attribute;
+- (CFBooleanRef)booleanValueOfAttribute:(CFStringRef)attribute:(bool)silent;
 
 - (AXValueRef)valueOfAttribute:(CFStringRef)attribute type:(AXValueType)type;
 - (BOOL)setValue:(AXValueRef)value forAttribute:(CFStringRef)attribute;

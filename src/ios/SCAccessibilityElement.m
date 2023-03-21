@@ -17,6 +17,10 @@ AXError stubAXUIElementGetWindow(AXUIElementRef elem, CGWindowID* out) {
 ElementGetWindowID elementGetWindowID = stubAXUIElementGetWindow;
 #endif
 
+
+const CFStringRef kAXEnhancedUserInterface = @"AXEnhancedUserInterface";
+
+
 @implementation NSWindowDataRequest
 @end
 
@@ -87,12 +91,14 @@ ElementGetWindowID elementGetWindowID = stubAXUIElementGetWindow;
 
 @implementation SCAccessibilityElement {
     AXUIElementRef _underlyingElement;
+    SCAccessibilityElement* _parent;
     pid_t _pid;
 }
 
 - (instancetype)init {
     if (self = [super init]) {
         _underlyingElement = NULL;
+        _parent = NULL;
         _pid = 0;
     }
 
@@ -173,7 +179,7 @@ ElementGetWindowID elementGetWindowID = stubAXUIElementGetWindow;
     return nil;
 }
 
-- (CFBooleanRef)booleanValueOfAttribute:(CFStringRef)attribute {
+- (CFBooleanRef)booleanValueOfAttribute:(CFStringRef)attribute:(bool)silent {
     if (CFGetTypeID(_underlyingElement) == AXUIElementGetTypeID()) {
         CFTypeRef value;
         AXError result;
@@ -233,9 +239,20 @@ ElementGetWindowID elementGetWindowID = stubAXUIElementGetWindow;
     AXValueRef sizeRef;
     positionRef = AXValueCreate(kAXValueTypeCGPoint, (const void *) &rect.origin);
     sizeRef = AXValueCreate(kAXValueTypeCGSize, (const void *) &rect.size);
+
+    CFBooleanRef enhancedUI = [_parent booleanValueOfAttribute:kAXEnhancedUserInterface :false];
+    if (enhancedUI != nil && enhancedUI == kCFBooleanTrue) {
+        AXValueRef valueRef = kCFBooleanFalse;
+        [_parent setValue:valueRef forAttribute:kAXEnhancedUserInterface];
+    }
     [self setValue:sizeRef forAttribute:kAXSizeAttribute];
     [self setValue:positionRef forAttribute:kAXPositionAttribute];
     [self setValue:sizeRef forAttribute:kAXSizeAttribute];
+    
+    if (enhancedUI != nil && enhancedUI == kCFBooleanTrue) {
+        AXValueRef valueRef = kCFBooleanTrue;
+        [self setValue:valueRef forAttribute:kAXEnhancedUserInterface];
+    }
     CFRelease(positionRef);
     CFRelease(sizeRef);
 }
@@ -266,6 +283,10 @@ ElementGetWindowID elementGetWindowID = stubAXUIElementGetWindow;
         CFRelease(_underlyingElement);
     }
     _underlyingElement = (AXUIElementRef) CFRetain(underlyingElement);
+}
+
+- (void)setParent:(SCAccessibilityElement*)parent {
+    _parent = (SCAccessibilityElement*) CFRetain(parent);
 }
 
 - (void)setPid:(pid_t)pid {
@@ -303,14 +324,14 @@ ElementGetWindowID elementGetWindowID = stubAXUIElementGetWindow;
     window.handle = cgWindowId;
 
     window.focused = nil;
-    CFBooleanRef main = [self booleanValueOfAttribute:kAXMainAttribute];
+    CFBooleanRef main = [self booleanValueOfAttribute:kAXMainAttribute:false];
     if (main != nil) {
         window.main = CFRetain(main);
         CFRelease(main);
     } else {
         window.main = nil;
     };
-    CFBooleanRef minimized = [self booleanValueOfAttribute:kAXMinimizedAttribute];
+    CFBooleanRef minimized = [self booleanValueOfAttribute:kAXMinimizedAttribute:false];
     if (minimized != nil) {
         window.minimized = CFRetain(minimized);
         CFRelease(minimized);
@@ -318,7 +339,7 @@ ElementGetWindowID elementGetWindowID = stubAXUIElementGetWindow;
         window.minimized = nil;
     };
 
-    CFBooleanRef fullscreen = [self booleanValueOfAttribute:@"AXFullScreen"];
+    CFBooleanRef fullscreen = [self booleanValueOfAttribute:@"AXFullScreen":false];
     if (fullscreen != nil) {
         window.fullscreen = CFRetain(fullscreen);
         CFRelease(fullscreen);
@@ -339,6 +360,7 @@ ElementGetWindowID elementGetWindowID = stubAXUIElementGetWindow;
             for (id elem in windowsLst) {
                 SCAccessibilityElement *accessibilityElement = [SCAccessibilityElement new];
                 accessibilityElement.underlyingElement = elem;
+                accessibilityElement.parent = self;
                 [res addObject:accessibilityElement];
             }
             [windowsLst release];
