@@ -14,9 +14,9 @@
 
 #define LODEPNG_COMPILE_PNG
 #define LODEPNG_COMPILE_DISK
-#include "png/lodepng.h"
+#include "shared/png/lodepng.h"
 
-#include "base64/base64.h"
+#include "shared/base64/base64.h"
 
 using namespace std::string_literals;
 
@@ -301,10 +301,11 @@ namespace Screen_Capture {
     std::shared_ptr<ShowingDesktopResult> ShowingDesktop(bool show)
     {
         std::shared_ptr<ShowingDesktopResult> res = std::make_shared<ShowingDesktopResult>();
+        res->success = false;
         XcbInitializer xcbInstance;
 //        auto &xcbInstance = XcbInitializer::getInstance();
         if (xcbInstance.showingDesktop(show)) {
-            // TODO think
+            res->success = true;
         }
         xcbInstance.flush();
 

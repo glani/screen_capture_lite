@@ -34,7 +34,7 @@ namespace Screen_Capture {
         MonitorDC.DC = GetWindowDC(SelectedWindow);
         CaptureDC.DC = CreateCompatibleDC(MonitorDC.DC);
 
-        CaptureBMP.Bitmap = CreateCompatibleBitmap(MonitorDC.DC, selectedwindow.Size.x, selectedwindow.Size.y);
+        CaptureBMP.Bitmap = CreateCompatibleBitmap(MonitorDC.DC, selectedwindow.Size.Width, selectedwindow.Size.Height);
 
         if (!MonitorDC.DC || !CaptureDC.DC || !CaptureBMP.Bitmap) {
             return DUPL_RETURN::DUPL_RETURN_ERROR_EXPECTED;
@@ -92,10 +92,10 @@ namespace Screen_Capture {
         ret.left = windowrect.ClientRect.left;
         ret.right = windowrect.ClientRect.right;
         ret.top = windowrect.ClientRect.top;
-        selectedwindow.Position.x = windowrect.ClientRect.left;
-        selectedwindow.Position.y = windowrect.ClientRect.top;
+        selectedwindow.Position.X = windowrect.ClientRect.left;
+        selectedwindow.Position.Y = windowrect.ClientRect.top;
 
-        if (!IsWindow(SelectedWindow) || selectedwindow.Size.x != Width(ret) || selectedwindow.Size.y != Height(ret)) {
+        if (!IsWindow(SelectedWindow) || selectedwindow.Size.Width != Width(ret) || selectedwindow.Size.Height != Height(ret)) {
             return DUPL_RETURN::DUPL_RETURN_ERROR_EXPECTED; // window size changed. This will rebuild everything
         }
 

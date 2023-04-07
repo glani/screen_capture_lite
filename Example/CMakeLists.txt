@@ -5,7 +5,7 @@ if(WIN32)
 	add_definitions(-DNOMINMAX)
 	if(MINGW)
 		list(APPEND ${PROJECT_NAME}_PLATFORM_LIBS
-				dxgi dxguid d3dx10 d3d11 d3dx11 Psapi)
+				dxgi dxguid d3dx10 d3d11 d3dx11 Psapi gdiplus)
 	endif()
 
 	MESSAGE(STATUS "Libs: ${${PROJECT_NAME}_PLATFORM_LIBS}")

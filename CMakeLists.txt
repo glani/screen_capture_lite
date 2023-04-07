@@ -37,6 +37,10 @@ if (WIN32)
             include/windows/DXUtilsHolder.h
             src/windows/stringhelper.cpp
             src/windows/stringhelper.h
+            src/shared/base64/base64.cpp
+            src/shared/base64/base64.h
+            src/shared/png/lodepng.cpp
+            src/shared/png/lodepng.h
             )
     set(SCREEN_CAPTURE_PLATFORM_INC
             include/windows
@@ -95,17 +99,17 @@ else ()
             src/linux/GetMonitors.cpp
             src/linux/GetWindows.cpp
             src/linux/Init.cpp
-            src/linux/png/lodepng.cpp
-            src/linux/png/lodepng.h
-            src/linux/base64/base64.cpp
-            src/linux/base64/base64.h
+            src/shared/png/lodepng.cpp
+            src/shared/png/lodepng.h
+            src/shared/base64/base64.cpp
+            src/shared/base64/base64.h
             src/linux/xcb/XcbInitializer.cpp
             src/linux/xcb/XcbInitializer.h
             src/linux/xcb/XcbAtom.cpp
             src/linux/xcb/XcbAtom.h
             src/linux/ThreadRunner.cpp
             src/linux/SyncRunner.cpp
-            src/linux/base64/base64.cpp src/linux/base64/base64.h)
+            )
     find_package(X11 REQUIRED)
     if (!X11_XTest_FOUND)
         message(FATAL_ERROR "X11 extensions are required, but not found!")
@@ -145,6 +149,7 @@ endif ()
 
 
 include_directories(
+        src
         include
         ${SCREEN_CAPTURE_PLATFORM_INC}
 )

@@ -8,27 +8,411 @@
 
 #include <Windows.h>
 #include <psapi.h>
+#include <shellapi.h>
+#include <ShlObj.h>
+#include "internal/SCShared.h"
+
+#define LODEPNG_COMPILE_PNG
+#define LODEPNG_COMPILE_DISK
+
+#include "shared/png/lodepng.h"
+
+#include "shared/base64/base64.h"
 
 namespace SL {
     namespace Screen_Capture {
 
-        std::shared_ptr<Window> getWindow(const HWND &hwnd);
-
-        struct srch {
+        struct SearchWindows {
             std::shared_ptr<std::vector<Window>> Found;
+            std::vector<Monitor> *Monitors;
+            bool RetrieveIcons;
         };
 
-        std::shared_ptr<Window> GetActiveWindow() {
-            HWND hwndForeground = GetForegroundWindow();
-            if (hwndForeground) {
-                return getWindow(hwndForeground);
-            }
+        std::vector<std::string> splitString(const std::string &str, char delimiter);
 
-            return std::shared_ptr<Window>();
+        std::shared_ptr<std::pair<HICON, HICON>> retrieveIcon(HANDLE hProcess);
+
+        std::shared_ptr<Window> getWindow(const HWND &hwnd, bool retrieveIcon, const std::vector<Monitor> *monitors);
+
+        RECT getRect(const Rect &rect);
+
+        int EnumWindowsProc(HWND hwnd, LPARAM lParam);
+
+        bool filterOutWindow(const HWND &hwnd);
+
+        std::shared_ptr<ShowingDesktopResult> ShowingDesktop(bool show) {
+            auto result = std::make_shared<ShowingDesktopResult>();
+            result->success = false;
+            HWND progman = FindWindow(L"Progman", L"Program Manager");
+            if (progman != NULL) {
+                // Send the message to show / hide the desktop
+                auto res = SendMessageTimeout(progman, show ? 0x052C : 0x001A, 0, 0, SMTO_NORMAL, 1000, NULL);
+                result->success = res == 0;
+            }
+            return result;
+        }
+
+        // will return all windows
+        std::shared_ptr<std::vector<Window>> GetWindows(const SearchAllWindowsRequest &request) {
+            SearchWindows s;
+            s.Found = std::make_shared<std::vector<Window>>();
+            auto monitors = GetMonitors();
+            s.Monitors = monitors.get();
+            s.RetrieveIcons = request.RetrieveIcons;
+            EnumWindows(EnumWindowsProc, reinterpret_cast<LPARAM>(&s));
+            return s.Found;
         }
 
 
-        std::shared_ptr<Window> getWindow(const HWND &hwnd) {
+        // Make window full screen
+        std::shared_ptr<Window> Fullscreen(const SingleWindowRequest &windowRequest, int display, bool fullscreen) {
+            HWND hwnd = reinterpret_cast<HWND>(windowRequest.Handle);
+            if (IsWindow(hwnd)) {
+                auto monitors = GetMonitors();
+                if (fullscreen) {
+                    if (::IsIconic(hwnd)) {
+                        ShowWindow(hwnd, SW_RESTORE);
+                        ShowWindow(hwnd, SW_SHOW);
+                    }
+                    auto wnd = getWindow(hwnd, false, monitors.get());
+                    if (wnd) {
+                        auto fullscreenIterator = std::find_if(wnd->Attributes.begin(), wnd->Attributes.end(),
+                                                               [&](const WindowAttribute &attr) {
+                                                                   return attr.Code == S_RES_FULLSCREEN &&
+                                                                          attr.Value == S_TRUE;
+                                                               });
+                        if (fullscreenIterator != wnd->Attributes.end()) {
+                            // window already in fullscreen
+                            // make it foreground and return
+                            SetForegroundWindow(hwnd);
+                            return wnd;
+                        } else {
+                            // determine display
+                            RECT windowRect;
+                            windowRect.top = wnd->Position.Y;
+                            windowRect.bottom = wnd->Position.Y + wnd->Size.Height;
+                            windowRect.left = wnd->Position.X;
+                            windowRect.right = wnd->Position.X + wnd->Size.Width;
+
+                            int i = 0;
+                            int monitorIndex = -1;
+                            int square = -1;
+                            for (const auto &monitor: *monitors) {
+                                const Rect &rect = monitor.Frame;
+                                RECT monitorRect = getRect(rect);
+                                RECT rectIntersection;
+                                BOOL intersect = ::IntersectRect(&rectIntersection, &monitorRect, &windowRect);
+                                if (intersect) {
+                                    int area = (rectIntersection.right - rectIntersection.left) *
+                                               (rectIntersection.bottom - rectIntersection.top);
+                                    if (area > square) {
+                                        square = area;
+                                        monitorIndex = i;
+                                    }
+                                }
+                                i++;
+                            }
+
+                            if (monitorIndex != -1) {
+                                auto monitor = monitors->at(monitorIndex);
+
+                                auto maximized = !!::IsZoomed(hwnd);
+                                if (maximized) {
+                                    SendMessage(hwnd, WM_SYSCOMMAND, SC_RESTORE, 0);
+                                }
+
+                                auto style = GetWindowLong(hwnd, GWL_STYLE);
+                                auto exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+
+                                // Set new window style and size.
+                                SetWindowLong(hwnd, GWL_STYLE,
+                                              style & ~(WS_CAPTION | WS_THICKFRAME));
+                                SetWindowLong(hwnd, GWL_EXSTYLE,
+                                              exStyle & ~(WS_EX_DLGMODALFRAME |
+                                                          WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE));
+
+                                // Set the window's position to cover the entire monitor
+                                SetWindowPos(hwnd, HWND_TOP, monitor.Frame.X, monitor.Frame.Y,
+                                             monitor.Frame.Width, monitor.Frame.Height,
+                                             SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+                                SetForegroundWindow(hwnd);
+                            }
+
+                            auto wndFullscreen = getWindow(hwnd, windowRequest.RetrieveIcons, monitors.get());
+                            auto removeAttributes = std::remove_if(wndFullscreen->Attributes.begin(),
+                                                                   wndFullscreen->Attributes.end(),
+                                                                   [&](const WindowAttribute &attr) {
+                                                                       return attr.Code ==
+                                                                              S_RES_WINDOWS_NORMAL_MAXIMIZED ||
+                                                                              attr.Code ==
+                                                                              S_RES_WINDOWS_NORMAL_EXSTYLE ||
+                                                                              attr.Code == S_RES_WINDOWS_NORMAL_STYLE ||
+                                                                              attr.Code == S_RES_NORMAL_SIZE;
+                                                                   });
+                            wndFullscreen->Attributes.erase(removeAttributes, wndFullscreen->Attributes.end());
+
+                            std::copy_if(wnd->Attributes.begin(), wnd->Attributes.end(),
+                                         std::back_inserter(wndFullscreen->Attributes),
+                                         [&](const WindowAttribute &attr) {
+                                             return attr.Code == S_RES_WINDOWS_NORMAL_MAXIMIZED ||
+                                                    attr.Code == S_RES_WINDOWS_NORMAL_EXSTYLE ||
+                                                    attr.Code == S_RES_WINDOWS_NORMAL_STYLE ||
+                                                    attr.Code == S_RES_NORMAL_SIZE;
+                                         });
+
+                            return wndFullscreen;
+                        }
+                    }
+                } else {
+                    if (::IsIconic(hwnd)) {
+                        ShowWindow(hwnd, SW_RESTORE);
+                        ShowWindow(hwnd, SW_SHOW);
+                    }
+                    LONG style = GetWindowLong(hwnd, GWL_STYLE);
+                    LONG exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+
+                    // Set new window style and size.
+                    SetWindowLong(hwnd, GWL_STYLE,
+                                  style | (WS_CAPTION | WS_THICKFRAME));
+                    SetWindowLong(hwnd, GWL_EXSTYLE,
+                                  exStyle | (WS_EX_DLGMODALFRAME |
+                                             WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE));
+
+                    auto normalSize = std::find_if(windowRequest.Attributes.begin(), windowRequest.Attributes.end(),
+                                                   [&](const WindowAttribute &attr) {
+                                                       return attr.Code == S_RES_NORMAL_SIZE;
+                                                   });
+                    auto normalMaximized = std::find_if(windowRequest.Attributes.begin(),
+                                                        windowRequest.Attributes.end(),
+                                                        [&](const WindowAttribute &attr) {
+                                                            return attr.Code == S_RES_WINDOWS_NORMAL_MAXIMIZED &&
+                                                                   attr.Value == S_TRUE;
+                                                        });
+                    if (normalSize != windowRequest.Attributes.end()) {
+                        char delimiter = ';';
+                        std::vector<std::string> tokens = splitString(normalSize->Value, delimiter);
+                        int x = std::atoi(tokens[0].c_str());
+                        int y = std::atoi(tokens[1].c_str());
+                        int width = std::atoi(tokens[2].c_str());
+                        int height = std::atoi(tokens[3].c_str());
+                        int offsetDisplay0X = std::atoi(tokens[4].c_str());
+                        int offsetDisplay0Y = std::atoi(tokens[5].c_str());
+                        POINT p = {.x = x, .y = y};
+                        auto monitorFound = false;
+                        for (const auto &monitor: *monitors) {
+                            RECT monitorRect = getRect(monitor.Frame);
+                            if (::PtInRect(&monitorRect, p)) {
+                                monitorFound = true;
+                            }
+                        }
+                        SetWindowPos(hwnd, HWND_TOP, monitorFound ? x : offsetDisplay0X,
+                                     monitorFound ? y : offsetDisplay0Y,
+                                     width, height,
+                                     SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+
+                    }
+
+                    if (normalMaximized != windowRequest.Attributes.end()) {
+                        ::SendMessage(hwnd, WM_SYSCOMMAND, SC_MAXIMIZE, 0);
+                    }
+
+                    SetForegroundWindow(hwnd);
+
+
+                    return getWindow(hwnd, windowRequest.RetrieveIcons, monitors.get());
+                }
+            }
+            return nullptr;
+        }
+
+        RECT getRect(const Rect &rect) {
+            RECT monitorRect;
+            monitorRect.left = rect.X;
+            monitorRect.right = rect.X + rect.Width;
+            monitorRect.top = rect.Y;
+            monitorRect.bottom = rect.Y + rect.Height;
+            return monitorRect;
+        }
+
+        // Make window minimize
+        std::shared_ptr<Window> Minimize(const SingleWindowRequest &windowRequest, bool minimize) {
+            return Visible(windowRequest, !minimize);
+        }
+
+        // Make window maximize
+        std::shared_ptr<Window> Maximize(const SingleWindowRequest &windowRequest, bool maximize) {
+            HWND hwnd = reinterpret_cast<HWND>(windowRequest.Handle);
+            if (IsWindow(hwnd)) {
+                if (IsIconic(hwnd)) {
+                    ShowWindow(hwnd, SW_SHOW);
+                }
+                if (IsZoomed(hwnd) != maximize) {
+                    ShowWindow(hwnd, maximize ? SW_MAXIMIZE : SW_RESTORE);
+                }
+                auto monitors = GetMonitors();
+                return getWindow(hwnd, windowRequest.RetrieveIcons, monitors.get());
+            }
+            return nullptr;
+        }
+
+        std::shared_ptr<Window> MaximizeHorz(const SingleWindowRequest &windowRequest, bool maximize) {
+            // not supported
+            return nullptr;
+        }
+
+        std::shared_ptr<Window> MaximizeVert(const SingleWindowRequest &windowRequest, bool maximize) {
+            // not supported
+            return nullptr;
+        }
+
+        // Make window minimize
+        std::shared_ptr<Window> Visible(const SingleWindowRequest &windowRequest, bool visible) {
+            HWND hwnd = reinterpret_cast<HWND>(windowRequest.Handle);
+            if (IsWindow(hwnd)) {
+                if (visible) {
+                    ShowWindow(hwnd, SW_RESTORE);
+                    ShowWindow(hwnd, SW_SHOW);
+                    // TODO think
+                    SetForegroundWindow(hwnd);
+                } else {
+                    ShowWindow(hwnd, SW_MINIMIZE);
+                }
+                auto monitors = GetMonitors();
+                return getWindow(hwnd, windowRequest.RetrieveIcons, monitors.get());
+            }
+            return nullptr;
+        }
+
+        // Close all windows / terminate application
+        std::shared_ptr<EmptyResult> CloseAllWindows(const SingleWindowRequest &windowRequest, bool force) {
+            // not supported
+            return std::make_shared<EmptyResult>();
+        }
+
+        // Close window
+        std::shared_ptr<EmptyResult> CloseWindow(const SingleWindowRequest &windowRequest, bool force) {
+            HWND hwnd = reinterpret_cast<HWND>(windowRequest.Handle);
+            if (IsWindow(hwnd)) {
+                if (!force) {
+                    SetForegroundWindow(hwnd);
+                    SendMessage(hwnd, WM_CLOSE, 0, 0);
+                } else {
+                    DWORD dwProcessId;
+                    GetWindowThreadProcessId(hwnd, &dwProcessId);
+                    // Open a handle to the process
+                    HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, dwProcessId);
+                    if (hProcess) {
+                        // Terminate the process
+                        TerminateProcess(hProcess, 0);
+                        // Close the process handle
+                        CloseHandle(hProcess);
+                    }
+                }
+                return std::make_shared<EmptyResult>();
+            }
+            return nullptr;
+        }
+
+        // Set rectangle
+        std::shared_ptr<Window>
+        Rectangle(const SingleWindowRequest &windowRequest, const Point &position, const SizeValues &size) {
+            HWND hwnd = reinterpret_cast<HWND>(windowRequest.Handle);
+            if (IsWindow(hwnd)) {
+                if (IsIconic(hwnd)) {
+                    ShowWindow(hwnd, SW_RESTORE);
+                    ShowWindow(hwnd, SW_SHOW);
+                }
+                if (IsZoomed(hwnd)) {
+                    ShowWindow(hwnd, SW_RESTORE);
+                }
+
+                SetWindowPos(hwnd, NULL, position.X, position.Y, size.Width, size.Height, SWP_NOZORDER);
+                auto monitors = GetMonitors();
+                return getWindow(hwnd, windowRequest.RetrieveIcons, monitors.get());
+            }
+            return nullptr;
+        }
+
+        // Make window top most
+        std::shared_ptr<Window> Topmost(const SingleWindowRequest &windowRequest) {
+            return Activate(windowRequest);
+        }
+
+        // Activate window
+        std::shared_ptr<Window> Activate(const SingleWindowRequest &windowRequest) {
+            HWND hwnd = reinterpret_cast<HWND>(windowRequest.Handle);
+            if (IsWindow(hwnd)) {
+                ShowWindow(hwnd, SW_RESTORE);
+                ShowWindow(hwnd, SW_SHOW);
+                SetForegroundWindow(hwnd);
+                auto monitors = GetMonitors();
+                return getWindow(hwnd, windowRequest.RetrieveIcons, monitors.get());
+            }
+            return nullptr;
+        }
+
+        // Native window info
+        std::shared_ptr<NativeWindow> NativeWindowInfo(char *data, const size_t sz) {
+            return nullptr;
+        }
+
+        // will return active window
+        std::shared_ptr<Window> GetActiveWindow(const SharedWindowsRequest &request) {
+            HWND hwndForeground = GetForegroundWindow();
+            if (hwndForeground) {
+                auto monitors = GetMonitors();
+                return getWindow(hwndForeground, request.RetrieveIcons, monitors.get());
+            }
+
+            return nullptr;
+        }
+
+        // will return requested window
+        std::shared_ptr<Window> GetWindow(const SingleWindowRequest &request) {
+            HWND hwnd = reinterpret_cast<HWND>(request.Handle);
+            if (IsWindow(hwnd)) {
+                auto monitors = GetMonitors();
+                return getWindow(hwnd, request.RetrieveIcons, monitors.get());
+            }
+            return nullptr;
+        }
+
+        // request accessibility permissions
+        bool RequestAccessibilityPermissions() {
+            return true;
+        }
+
+        // InitWindows
+        void InitWindows() {
+
+        }
+
+        int EnumWindowsProc(HWND hwnd, LPARAM lParam) {
+            DWORD pid;
+            GetWindowThreadProcessId(hwnd, &pid);
+            if (pid == GetCurrentProcessId()) {
+                return TRUE;
+            }
+
+            auto *s = reinterpret_cast<SearchWindows *>(lParam);
+            auto w = getWindow(hwnd, s->RetrieveIcons, s->Monitors);
+            if (w) {
+                s->Found->emplace_back(*w);
+            }
+            return TRUE;
+        }
+
+
+        std::shared_ptr<std::string> retrieveBase64IconData(HICON hIcon);
+
+        void fillIconsIfNeeded(Window &window, HICON hIcon, bool retrieveIcons);
+
+        std::shared_ptr<Window> getWindow(const HWND &hwnd, bool retrieveIcons, const std::vector<Monitor> *monitors) {
+
+            if (filterOutWindow(hwnd)) {
+                return nullptr;
+            }
+
             Window w = {};
             w.Name = std::string();
 
@@ -41,81 +425,304 @@ namespace SL {
                 return std::shared_ptr<Window>();
             }
             w.Handle = reinterpret_cast<size_t>(hwnd);
-            auto windowrect = GetWindowRect(hwnd);
-            w.Position.x = windowrect.ClientRect.left;
-            w.Position.y = windowrect.ClientRect.top;
-            w.Size.x = windowrect.ClientRect.right - windowrect.ClientRect.left;
-            w.Size.y = windowrect.ClientRect.bottom - windowrect.ClientRect.top;
+            auto windowRect = GetWindowRect(hwnd);
+            w.Position.X = windowRect.ClientRect.left;
+            w.Position.Y = windowRect.ClientRect.top;
+            w.Size.Width = windowRect.ClientRect.right - windowRect.ClientRect.left;
+            w.Size.Height = windowRect.ClientRect.bottom - windowRect.ClientRect.top;
 
             wchar_t filenameBuffer[4000];
             DWORD processId;
             GetWindowThreadProcessId(hwnd, &processId);
             auto hProcess = OpenProcess(
-                    PROCESS_QUERY_LIMITED_INFORMATION,
+                    PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, // PROCESS_QUERY_LIMITED_INFORMATION,
                     FALSE,
                     processId);
             if (hProcess != NULL) {
-//                DWORD len;
-//                auto r = QueryFullProcessImageName(hProcess, 0, filenameBuffer, &len);
-//                DWORD dwLastError = GetLastError();
-//                if (r) {
-//                    WindowAttribute attributeName;
-//                    attributeName.Code = std::string("res_name");
-//                    attributeName.Value = StringHelper::ws2s(std::wstring(filenameBuffer, len));
-//                    w.Attributes.emplace_back(attributeName);
-//                }
-                auto len = GetProcessImageFileName(
+                auto lenImageFileName = GetProcessImageFileName(
                         hProcess,
                         filenameBuffer,
                         4000
                 );
-                if (len > 0) {
+                if (lenImageFileName > 0) {
                     WindowAttribute attributeName;
-                    attributeName.Code = std::string("res_name");
-                    attributeName.Value = StringHelper::ws2s(std::wstring(filenameBuffer, len));
+                    attributeName.Code = std::string(S_RES_NAME_ALT);
+                    attributeName.Value = StringHelper::ws2s(std::wstring(filenameBuffer, lenImageFileName));
                     w.Attributes.emplace_back(attributeName);
                 }
+                TCHAR process_filename[MAX_PATH];
+                DWORD charsCarried = MAX_PATH;
+                QueryFullProcessImageName(hProcess, 0, process_filename, &charsCarried);
+                if (charsCarried) {
+                    w.ProcessName = StringHelper::ws2s(std::wstring(process_filename, charsCarried));
+                    WindowAttribute attributeName;
+                    attributeName.Code = std::string(S_RES_START_ABSOLUTE_URL);
+                    attributeName.Value = w.ProcessName;
+                    w.Attributes.emplace_back(attributeName);
+                }
+
+                HMODULE hMod;
+                DWORD cbNeeded;
+                if (EnumProcessModules(hProcess, &hMod, sizeof(hMod), &cbNeeded)) {
+                    WCHAR szProcessName[MAX_PATH] = L"";
+                    auto len = GetModuleBaseName(hProcess, hMod, szProcessName, sizeof(szProcessName) / sizeof(WCHAR));
+                    w.ProcessName = StringHelper::ws2s(std::wstring(szProcessName, len));
+                    if (len > 0) {
+                        WindowAttribute attributeName;
+                        attributeName.Code = std::string(S_RES_NAME);
+                        attributeName.Value = w.ProcessName;
+                        w.Attributes.emplace_back(attributeName);
+                    }
+                }
+
+
+                HICON hIcon = (HICON) SendMessage(hwnd, WM_GETICON, ICON_BIG, 0);
+                if (hIcon != NULL) {
+                    auto image = retrieveBase64IconData(hIcon);
+                    fillIconsIfNeeded(w, hIcon, retrieveIcons);
+                    DestroyIcon(hIcon);
+                } else {
+                    auto icons = retrieveIcon(hProcess);
+                    if (icons) {
+                        HICON hIconProcess;
+                        if (icons->second) {
+                            hIconProcess = icons->second;
+                        } else {
+                            hIconProcess = icons->first;
+                        }
+                        if (hIconProcess) {
+                            fillIconsIfNeeded(w, hIconProcess, retrieveIcons);
+                        }
+                        if (icons->second) {
+                            DestroyIcon(icons->second);
+                        }
+                        if (icons->first) {
+                            DestroyIcon(icons->first);
+                        }
+                    }
+                }
+
                 CloseHandle(hProcess);
             }
 
             wchar_t classNameBuffer[4000];
             if (UINT len = GetClassName(hwnd, classNameBuffer, 4000) > 0) {
                 WindowAttribute attributeName;
-                attributeName.Code = std::string("res_class");
+                attributeName.Code = S_RES_CLASS;
                 attributeName.Value = StringHelper::ws2s(std::wstring(classNameBuffer, len));
                 w.Attributes.emplace_back(attributeName);
             }
 
-            BOOL visible = IsWindowVisible(hwnd);
+            BOOL visible = !IsIconic(hwnd);
             WindowAttribute attributeVisible;
-            attributeVisible.Code = std::string("res_visible");
-            attributeVisible.Value = visible ? "TRUE" : "FALSE";
+            attributeVisible.Code = S_RES_VISIBLE;
+            attributeVisible.Value = visible ? S_TRUE : S_FALSE;
             w.Attributes.emplace_back(attributeVisible);
+
+            if (visible) {
+                // check fullscreen
+                const Monitor *targetMonitor;
+                for (const auto &monitor: *monitors) {
+                    if (monitor.Frame.X == w.Position.X
+                        && monitor.Frame.Y == w.Position.Y) {
+                        targetMonitor = &monitor;
+                        break;
+                    }
+                }
+                bool fullscreen = false;
+                if (targetMonitor
+                    && targetMonitor->Frame.Width == w.Size.Width
+                    && targetMonitor->Frame.Height == w.Size.Height) {
+                    WindowAttribute attributeFullscreen;
+                    attributeFullscreen.Code = S_RES_FULLSCREEN;
+                    attributeFullscreen.Value = S_TRUE;
+                    w.Attributes.emplace_back(attributeFullscreen);
+                    fullscreen = true;
+                }
+
+                if (!fullscreen) {
+                    auto style = GetWindowLong(hwnd, GWL_STYLE);
+                    auto exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+                    WindowAttribute attributeStyle;
+                    char s[256];
+                    sprintf(s, "%ld", style);
+                    attributeStyle.Value = s;
+                    attributeStyle.Code = S_RES_WINDOWS_NORMAL_STYLE;
+                    w.Attributes.emplace_back(attributeStyle);
+
+                    WindowAttribute attributeExStyle;
+                    sprintf(s, "%ld", exStyle);
+                    attributeExStyle.Value = s;
+                    attributeExStyle.Code = S_RES_WINDOWS_NORMAL_EXSTYLE;
+                    w.Attributes.emplace_back(attributeExStyle);
+
+                    WindowAttribute attributeNormalSize;
+                    sprintf(s, "%d;%d;%d;%d;%d;%d", w.Position.X, w.Position.Y, w.Size.Width, w.Size.Height,
+                            w.Position.X - targetMonitor->Frame.X, w.Position.Y - targetMonitor->Frame.Y);
+                    attributeNormalSize.Value = s;
+                    attributeNormalSize.Code = S_RES_NORMAL_SIZE;
+                    w.Attributes.emplace_back(attributeNormalSize);
+
+
+                    WINDOWPLACEMENT wp;
+                    wp.length = sizeof(WINDOWPLACEMENT);
+                    GetWindowPlacement(hwnd, &wp);
+                    if (wp.showCmd == SW_SHOWMAXIMIZED) {
+                        WindowAttribute attributeNormalMaximized;
+                        attributeNormalMaximized.Code = S_RES_WINDOWS_NORMAL_MAXIMIZED;
+                        attributeNormalMaximized.Value = S_TRUE;
+                        w.Attributes.emplace_back(attributeNormalMaximized);
+
+                        // the window is maximized, and it may be in fullscreen mode
+                        WindowAttribute attributeMaximized;
+                        attributeMaximized.Code = S_RES_MAXIMIZED;
+                        attributeMaximized.Value = S_TRUE;
+                        w.Attributes.emplace_back(attributeMaximized);
+
+                        WindowAttribute attributeFullscreen;
+                        attributeFullscreen.Code = S_RES_FULLSCREEN;
+                        attributeFullscreen.Value = S_FALSE;
+                        w.Attributes.emplace_back(attributeFullscreen);
+
+
+                    } else {
+                        // the window is not maximized, and it is not in fullscreen mode
+                        WindowAttribute attributeMaximized;
+                        attributeMaximized.Code = S_RES_MAXIMIZED;
+                        attributeMaximized.Value = S_FALSE;
+                        w.Attributes.emplace_back(attributeMaximized);
+                    }
+                }
+            }
 
             return std::make_shared<Window>(w);
         }
 
-        int EnumWindowsProc(HWND hwnd, LPARAM lParam) {
-            DWORD pid;
-            GetWindowThreadProcessId(hwnd, &pid);
-//            auto parent = GetParent(hwnd);
-            if (/*parent == NULL || */pid == GetCurrentProcessId()) {
-                return TRUE;
+        void fillIconsIfNeeded(Window &window, HICON hIcon, bool retrieveIcons) {
+            if (retrieveIcons) {
+                auto image = retrieveBase64IconData(hIcon);
+                if (image) {
+                    WindowAttribute attributeIcon;
+                    attributeIcon.Code = std::string(S_RES_ICON_URL);
+                    attributeIcon.Value = *image;
+                    window.Attributes.emplace_back(attributeIcon);
+                }
             }
-
-            auto w = getWindow(hwnd);
-            if (w) {
-                srch *s = (srch *) lParam;
-                s->Found->emplace_back(*w);
-            }
-            return TRUE;
+            WindowAttribute attributeIconExist;
+            attributeIconExist.Code = std::string(S_RES_ICON_EXIST);
+            attributeIconExist.Value = S_TRUE;
+            window.Attributes.emplace_back(attributeIconExist);
         }
 
-        std::shared_ptr<std::vector<Window>> GetWindows() {
-            srch s;
-            s.Found = std::make_shared<std::vector<Window>>();
-            EnumWindows(EnumWindowsProc, (LPARAM) &s);
-            return s.Found;
+        std::shared_ptr<std::string> retrieveBase64IconData(HICON hIcon) {
+            ICONINFO infoIconProcess;
+            GetIconInfo(hIcon, &infoIconProcess);
+            std::shared_ptr<std::string> result;
+
+            // Create bitmap from icon data
+            BITMAP bmp = {};
+            GetObject(infoIconProcess.hbmColor, sizeof(BITMAP), &bmp);
+            BITMAPINFO bmi = {};
+            bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+            bmi.bmiHeader.biWidth = bmp.bmWidth;
+            bmi.bmiHeader.biHeight = -bmp.bmHeight;
+            bmi.bmiHeader.biPlanes = 1;
+            bmi.bmiHeader.biBitCount = bmp.bmBitsPixel;
+            bmi.bmiHeader.biCompression = BI_RGB;
+            BYTE *pBits = NULL;
+            HBITMAP hBitmap = CreateDIBSection(NULL, &bmi, DIB_RGB_COLORS, (void **) &pBits, NULL, 0);
+            HDC hMemDC = CreateCompatibleDC(NULL);
+            HBITMAP hOldBitmap = (HBITMAP) SelectObject(hMemDC, hBitmap);
+            if (DrawIconEx(hMemDC, 0, 0, hIcon, bmp.bmWidth, bmp.bmHeight, 0, NULL, DI_NORMAL)) {
+
+                // Create image from bitmap data
+                unsigned char *pngData;
+                size_t outsize;
+                unsigned int pngEncResult = lodepng_encode_memory(&pngData, &outsize, pBits, bmp.bmWidth, bmp.bmHeight,
+                                                                  LCT_RGBA, 8);
+
+                if (0 != pngEncResult) {
+                    result = nullptr;
+                } else {
+                    auto iconStrValue = base64_encode(pngData, outsize, std::string("data:image/png;base64,"), false);
+                    result = std::make_shared<std::string>(iconStrValue);
+                }
+                delete[] pngData;
+            } else {
+                result = nullptr;
+            }
+
+            // Clean up
+            DeleteObject(infoIconProcess.hbmColor);
+            DeleteObject(infoIconProcess.hbmMask);
+            DeleteObject(hBitmap);
+            SelectObject(hMemDC, hOldBitmap);
+            DeleteDC(hMemDC);
+
+            return result;
+        }
+
+        std::shared_ptr<std::pair<HICON, HICON>> retrieveIcon(HANDLE hProcess) {
+            // Get the path of the executable file
+            wchar_t path[MAX_PATH];
+            DWORD pathSize = GetModuleFileNameEx(hProcess, NULL, &path[0], MAX_PATH);
+
+            if (pathSize == 0) {
+                return nullptr;
+            }
+
+            // Extract the icon
+            HICON hIcon;
+            HICON hIconLarge;
+            ExtractIconEx(&path[0], 0, &hIconLarge, &hIcon, 1);
+            return std::make_shared<std::pair<HICON, HICON>>(std::make_pair(hIcon, hIconLarge));
+        }
+
+
+        bool filterOutWindow(const HWND &hwnd) {
+            if (!::IsWindowVisible(hwnd)) {
+                return true;
+            }
+            const DWORD kExcludedStyles = WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW |
+                                          WS_EX_COMPOSITED | WS_EX_LAYERED;
+            const DWORD kAllowedStyles =
+                    WS_CHILD | WS_POPUP | WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU |
+                    WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME;
+            DWORD ex_style = ::GetWindowLong(hwnd, GWL_EXSTYLE);
+            DWORD style = ::GetWindowLong(hwnd, GWL_STYLE);
+            // Filter out windows that have excluded styles or do not have allowed styles.
+            if ((ex_style & kExcludedStyles) || !(style & kAllowedStyles)) {
+                return true;
+            }
+            // Filter out windows that have certain class names.
+            wchar_t class_name[MAX_PATH] = {0};
+            if (::GetClassNameW(hwnd, class_name, MAX_PATH) &&
+                (lstrcmpiW(class_name, L"WorkerW") == 0 ||
+                 lstrcmpiW(class_name, L"Progman") == 0)) {
+                return true;
+            }
+            // Filter out windows that have certain titles.
+            wchar_t window_title[MAX_PATH] = {0};
+            if (::GetWindowTextW(hwnd, window_title, MAX_PATH) &&
+                lstrcmpiW(window_title, L"Program Manager") == 0) {
+                return true;
+            }
+            return false;
+        }
+
+        std::vector<std::string> splitString(const std::string &str, char delimiter) {
+            std::vector<std::string> result;
+            size_t pos = 0;
+            while (pos != std::string::npos) {
+                size_t endPos = str.find(delimiter, pos);
+                if (endPos == std::string::npos) {
+                    result.push_back(str.substr(pos));
+                    break;
+                }
+                result.push_back(str.substr(pos, endPos - pos));
+                pos = endPos + 1;
+            }
+            return result;
         }
 
     } // namespace Screen_Capture

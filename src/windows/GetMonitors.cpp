@@ -25,12 +25,33 @@ namespace Screen_Capture {
         return 1.0f;
     }
 
+    RECT frameToRect(const Rect& frame) {
+        RECT rect;
+        rect.left = frame.X;
+        rect.top = frame.Y;
+        rect.bottom = frame.Y  + frame.Height;
+        rect.right = frame.X  + frame.Width;
+        return rect;
+    }
+
+    Rect rectToFrame(const RECT & rect) {
+        Rect frame;
+        frame.X = rect.left;
+        frame.Y = rect.top;
+        frame.Width = rect.right - rect.left;
+        frame.Height = rect.bottom - rect.top;
+        return frame;
+    }
+
     std::shared_ptr<std::vector<Monitor>> GetMonitors()
     {
         std::shared_ptr<std::vector<Monitor>> ret = std::make_shared<std::vector<Monitor>>();
 
         IDXGIAdapter *pAdapter = nullptr;
         IDXGIFactory *pFactory = nullptr;
+
+        // Get the handle to the primary display
+        HMONITOR primaryMonitor = MonitorFromPoint(POINT{0,0}, MONITOR_DEFAULTTOPRIMARY);
 
         // Create a DXGIFactory object.
         if (SUCCEEDED(CreateDXGIFactory(__uuidof(IDXGIFactory), (void **)&pFactory))) {
@@ -52,9 +73,18 @@ namespace Screen_Capture {
                     auto scale = scaleFromDpi(xdpi);
 
                     bool flipSides = desc.Rotation == DXGI_MODE_ROTATION_ROTATE90 || desc.Rotation == DXGI_MODE_ROTATION_ROTATE270;
-                    ret->emplace_back(CreateMonitor(static_cast<int>(ret->size()), j, i, flipSides ? devMode.dmPelsWidth : devMode.dmPelsHeight,
-                                                flipSides ? devMode.dmPelsHeight : devMode.dmPelsWidth, devMode.dmPosition.x, devMode.dmPosition.y,
-                                                name, scale));
+                    Monitor monitor = CreateMonitor(static_cast<int>(ret->size()), j, i,
+                                                        flipSides ? devMode.dmPelsWidth : devMode.dmPelsHeight,
+                                                        flipSides ? devMode.dmPelsHeight : devMode.dmPelsWidth,
+                                                        devMode.dmPosition.x, devMode.dmPosition.y,
+                                                        name, scale);
+                    monitor.Main = desc.Monitor == primaryMonitor;
+                    // Get the monitor information
+                    MONITORINFO monitorInfo = { sizeof(monitorInfo) };
+                    GetMonitorInfo(desc.Monitor, &monitorInfo);
+                    monitor.VisibleFrame = rectToFrame(monitorInfo.rcWork);
+
+                    ret->emplace_back(monitor);
                 }
                 pAdapter->Release();
             }

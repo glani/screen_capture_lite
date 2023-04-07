@@ -63,6 +63,7 @@ namespace Screen_Capture {
 
     struct SC_LITE_EXTERN Window {
         size_t Handle;
+        size_t Handle1;
         size_t OwnerHandle;
         Point Position;
         FrameValues Frame;
@@ -80,6 +81,7 @@ namespace Screen_Capture {
 
     struct SC_LITE_EXTERN SingleWindowRequest {
         size_t Handle;
+        size_t Handle1;
         size_t OwnerHandle;
         Point Position;
         SizeValues Size;
@@ -87,6 +89,7 @@ namespace Screen_Capture {
         bool Fullscreen;
         bool RetrieveIcons;
         bool ActiveFlag;
+        std::vector<WindowAttribute> Attributes;
     };
 
     struct SC_LITE_EXTERN SearchAllWindowsRequest {
@@ -153,7 +156,9 @@ namespace Screen_Capture {
         }
     };
 
-    struct SC_LITE_EXTERN ShowingDesktopResult {};
+    struct SC_LITE_EXTERN ShowingDesktopResult {
+        bool success;
+    };
 
     struct SC_LITE_EXTERN EmptyResult {};
 
@@ -250,6 +255,8 @@ namespace Screen_Capture {
         windowRequest.OwnerHandle = window.OwnerHandle;
         windowRequest.Position = window.Position;
         windowRequest.Size = window.Size;
+
+        windowRequest.Attributes = window.Attributes;
         //        windowRequest.Minimized = window.Minimized;
         //        windowRequest.Fullscreen = window.Fullscreen;
 
