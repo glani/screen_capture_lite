@@ -8,7 +8,7 @@
 #include <thread>
 #include <vector>
 
-#if defined(WINDOWS) || defined(WIN32)
+#if defined(_WINDOWS) || defined(WIN32)
 #if defined(SC_LITE_DLL)
 #define SC_LITE_EXTERN __declspec(dllexport)
 #else
