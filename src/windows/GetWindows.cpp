@@ -11,6 +11,7 @@
 #include <shellapi.h>
 #include <ShlObj.h>
 #include "internal/SCShared.h"
+#include <UIAutomation.h>
 
 #define LODEPNG_COMPILE_PNG
 #define LODEPNG_COMPILE_DISK
@@ -36,9 +37,16 @@ namespace SL {
 
         RECT getRect(const Rect &rect);
 
-        int EnumWindowsProc(HWND hwnd, LPARAM lParam);
+        BOOL CALLBACK enumWindowsProc(HWND hwnd, LPARAM lParam);
 
         bool filterOutWindow(const HWND &hwnd);
+
+        bool bringToFront(HWND hwnd);
+
+        std::shared_ptr<std::string> retrieveBase64IconData(HICON hIcon);
+
+        void fillIconsIfNeeded(Window &window, HICON hIcon, bool retrieveIcons);
+
 
         std::shared_ptr<ShowingDesktopResult> ShowingDesktop(bool show) {
             auto result = std::make_shared<ShowingDesktopResult>();
@@ -59,7 +67,7 @@ namespace SL {
             auto monitors = GetMonitors();
             s.Monitors = monitors.get();
             s.RetrieveIcons = request.RetrieveIcons;
-            EnumWindows(EnumWindowsProc, reinterpret_cast<LPARAM>(&s));
+            ::EnumWindows(enumWindowsProc, reinterpret_cast<LPARAM>(&s));
             return s.Found;
         }
 
@@ -84,7 +92,7 @@ namespace SL {
                         if (fullscreenIterator != wnd->Attributes.end()) {
                             // window already in fullscreen
                             // make it foreground and return
-                            SetForegroundWindow(hwnd);
+                            // SetForegroundWindow(hwnd);
                             return wnd;
                         } else {
                             // determine display
@@ -135,7 +143,7 @@ namespace SL {
                                 SetWindowPos(hwnd, HWND_TOP, monitor.Frame.X, monitor.Frame.Y,
                                              monitor.Frame.Width, monitor.Frame.Height,
                                              SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
-                                SetForegroundWindow(hwnd);
+                                // SetForegroundWindow(hwnd);
                             }
 
                             auto wndFullscreen = getWindow(hwnd, windowRequest.RetrieveIcons, monitors.get());
@@ -197,7 +205,9 @@ namespace SL {
                         int height = std::atoi(tokens[3].c_str());
                         int offsetDisplay0X = std::atoi(tokens[4].c_str());
                         int offsetDisplay0Y = std::atoi(tokens[5].c_str());
-                        POINT p = {.x = x, .y = y};
+                        POINT p;
+                        p.x = x;
+                        p.y = y;
                         auto monitorFound = false;
                         for (const auto &monitor: *monitors) {
                             RECT monitorRect = getRect(monitor.Frame);
@@ -216,7 +226,7 @@ namespace SL {
                         ::SendMessage(hwnd, WM_SYSCOMMAND, SC_MAXIMIZE, 0);
                     }
 
-                    SetForegroundWindow(hwnd);
+                    // SetForegroundWindow(hwnd);
 
 
                     return getWindow(hwnd, windowRequest.RetrieveIcons, monitors.get());
@@ -225,18 +235,21 @@ namespace SL {
             return nullptr;
         }
 
-        RECT getRect(const Rect &rect) {
-            RECT monitorRect;
-            monitorRect.left = rect.X;
-            monitorRect.right = rect.X + rect.Width;
-            monitorRect.top = rect.Y;
-            monitorRect.bottom = rect.Y + rect.Height;
-            return monitorRect;
-        }
-
         // Make window minimize
         std::shared_ptr<Window> Minimize(const SingleWindowRequest &windowRequest, bool minimize) {
-            return Visible(windowRequest, !minimize);
+            HWND hwnd = reinterpret_cast<HWND>(windowRequest.Handle);
+            if (IsWindow(hwnd)) {
+                if (!minimize) {
+                    ShowWindow(hwnd, SW_RESTORE);
+                    ShowWindow(hwnd, SW_SHOW);
+
+                } else {
+                    ShowWindow(hwnd, SW_MINIMIZE);
+                }
+                auto monitors = GetMonitors();
+                return getWindow(hwnd, windowRequest.RetrieveIcons, monitors.get());
+            }
+            return nullptr;
         }
 
         // Make window maximize
@@ -270,10 +283,10 @@ namespace SL {
             HWND hwnd = reinterpret_cast<HWND>(windowRequest.Handle);
             if (IsWindow(hwnd)) {
                 if (visible) {
-                    ShowWindow(hwnd, SW_RESTORE);
+                    if (IsIconic(hwnd)) {
+                        ShowWindow(hwnd, SW_RESTORE);
+                    }
                     ShowWindow(hwnd, SW_SHOW);
-                    // TODO think
-                    SetForegroundWindow(hwnd);
                 } else {
                     ShowWindow(hwnd, SW_MINIMIZE);
                 }
@@ -294,7 +307,7 @@ namespace SL {
             HWND hwnd = reinterpret_cast<HWND>(windowRequest.Handle);
             if (IsWindow(hwnd)) {
                 if (!force) {
-                    SetForegroundWindow(hwnd);
+                    // SetForegroundWindow(hwnd);
                     SendMessage(hwnd, WM_CLOSE, 0, 0);
                 } else {
                     DWORD dwProcessId;
@@ -326,7 +339,7 @@ namespace SL {
                     ShowWindow(hwnd, SW_RESTORE);
                 }
 
-                SetWindowPos(hwnd, NULL, position.X, position.Y, size.Width, size.Height, SWP_NOZORDER);
+                SetWindowPos(hwnd, nullptr, position.X, position.Y, size.Width, size.Height, SWP_NOZORDER);
                 auto monitors = GetMonitors();
                 return getWindow(hwnd, windowRequest.RetrieveIcons, monitors.get());
             }
@@ -335,16 +348,38 @@ namespace SL {
 
         // Make window top most
         std::shared_ptr<Window> Topmost(const SingleWindowRequest &windowRequest) {
-            return Activate(windowRequest);
+            HWND hwnd = reinterpret_cast<HWND>(windowRequest.Handle);
+            if (IsWindow(hwnd)) {
+                if (IsIconic(hwnd)) {
+                    ShowWindow(hwnd, SW_RESTORE);
+                    ShowWindow(hwnd, SW_SHOW);
+                }
+                // SetForegroundWindow(hwnd);
+                // Bring the window on top of all other windows
+
+                SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+                bringToFront(hwnd);
+                SetForegroundWindow(hwnd);
+                bringToFront(hwnd);
+                auto monitors = GetMonitors();
+                return getWindow(hwnd, windowRequest.RetrieveIcons, monitors.get());
+            }
+            return nullptr;
         }
 
         // Activate window
         std::shared_ptr<Window> Activate(const SingleWindowRequest &windowRequest) {
             HWND hwnd = reinterpret_cast<HWND>(windowRequest.Handle);
             if (IsWindow(hwnd)) {
-                ShowWindow(hwnd, SW_RESTORE);
-                ShowWindow(hwnd, SW_SHOW);
+                if (IsIconic(hwnd)) {
+                    ShowWindow(hwnd, SW_RESTORE);
+                    ShowWindow(hwnd, SW_SHOW);
+                }
+                // Bring the window on top of all other windows
+                SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+                bringToFront(hwnd);
                 SetForegroundWindow(hwnd);
+                bringToFront(hwnd);
                 auto monitors = GetMonitors();
                 return getWindow(hwnd, windowRequest.RetrieveIcons, monitors.get());
             }
@@ -384,10 +419,9 @@ namespace SL {
 
         // InitWindows
         void InitWindows() {
-
         }
 
-        int EnumWindowsProc(HWND hwnd, LPARAM lParam) {
+        BOOL CALLBACK enumWindowsProc(HWND hwnd, LPARAM lParam) {
             DWORD pid;
             GetWindowThreadProcessId(hwnd, &pid);
             if (pid == GetCurrentProcessId()) {
@@ -402,10 +436,47 @@ namespace SL {
             return TRUE;
         }
 
+        bool bringToFront(HWND hwnd) {
+            if (!SUCCEEDED(CoInitialize(nullptr))) {
+            }
 
-        std::shared_ptr<std::string> retrieveBase64IconData(HICON hIcon);
+            IUIAutomation* uiAutomation;
+            bool result = false;
+            if (!SUCCEEDED(CoCreateInstance(__uuidof(CUIAutomation), NULL, CLSCTX_INPROC_SERVER, __uuidof(IUIAutomation), (void**)&uiAutomation)))
+            {
+                return result;
+            }
 
-        void fillIconsIfNeeded(Window &window, HICON hIcon, bool retrieveIcons);
+            // First restore if window is minimized
+
+            WINDOWPLACEMENT placement{};
+            placement.length = sizeof(placement);
+
+            if (!GetWindowPlacement(hwnd, &placement))
+                return false;
+
+            bool minimized = placement.showCmd == SW_SHOWMINIMIZED;
+            if (minimized) {
+                ShowWindow(hwnd, SW_RESTORE);
+            }
+
+            // Then bring it to front using UI automation
+
+            IUIAutomationElement* window = nullptr;
+            if (SUCCEEDED(uiAutomation->ElementFromHandle(hwnd, &window)))
+            {
+                if (SUCCEEDED(window->SetFocus()))
+                {
+                    result = true;
+                }
+
+                window->Release();
+            }
+
+            uiAutomation->Release();
+            CoUninitialize();
+            return result;
+        }
 
         std::shared_ptr<Window> getWindow(const HWND &hwnd, bool retrieveIcons, const std::vector<Monitor> *monitors) {
 
@@ -420,16 +491,29 @@ namespace SL {
             auto buffer = new wchar_t[length];
             std::unique_ptr<wchar_t> _(buffer);
             auto textlen = GetWindowText(hwnd, buffer, length);
-            w.Name = StringHelper::ws2s(std::wstring(buffer, textlen));
-            if (w.Name.size() == 0) {
-                return std::shared_ptr<Window>();
+            if (textlen >= 0) {
+                w.Name = StringHelper::ws2s(std::wstring(buffer, textlen));
             }
+
             w.Handle = reinterpret_cast<size_t>(hwnd);
             auto windowRect = GetWindowRect(hwnd);
+
             w.Position.X = windowRect.ClientRect.left;
             w.Position.Y = windowRect.ClientRect.top;
             w.Size.Width = windowRect.ClientRect.right - windowRect.ClientRect.left;
             w.Size.Height = windowRect.ClientRect.bottom - windowRect.ClientRect.top;
+
+            // the same idea like in Linux
+            w.Frame.LeftFrame = -windowRect.ClientBorder.left;
+            w.Frame.RightFrame = -windowRect.ClientBorder.right;
+            w.Frame.TopFrame = -windowRect.ClientBorder.top;
+            w.Frame.BottomFrame = -windowRect.ClientBorder.bottom;
+
+            DWORD dwProcessId;
+            if (GetWindowThreadProcessId(hwnd, &dwProcessId))
+            {
+                w.OwnerHandle = dwProcessId;
+            }
 
             wchar_t filenameBuffer[4000];
             DWORD processId;
@@ -450,30 +534,27 @@ namespace SL {
                     attributeName.Value = StringHelper::ws2s(std::wstring(filenameBuffer, lenImageFileName));
                     w.Attributes.emplace_back(attributeName);
                 }
-                TCHAR process_filename[MAX_PATH];
+                TCHAR processFileName[MAX_PATH];
                 DWORD charsCarried = MAX_PATH;
-                QueryFullProcessImageName(hProcess, 0, process_filename, &charsCarried);
+                QueryFullProcessImageName(hProcess, 0, processFileName, &charsCarried);
                 if (charsCarried) {
-                    w.ProcessName = StringHelper::ws2s(std::wstring(process_filename, charsCarried));
+                    w.ProcessName = StringHelper::ws2s(std::wstring(processFileName, charsCarried));
                     WindowAttribute attributeName;
                     attributeName.Code = std::string(S_RES_START_ABSOLUTE_URL);
                     attributeName.Value = w.ProcessName;
                     w.Attributes.emplace_back(attributeName);
                 }
 
-                HMODULE hMod;
-                DWORD cbNeeded;
-                if (EnumProcessModules(hProcess, &hMod, sizeof(hMod), &cbNeeded)) {
-                    WCHAR szProcessName[MAX_PATH] = L"";
-                    auto len = GetModuleBaseName(hProcess, hMod, szProcessName, sizeof(szProcessName) / sizeof(WCHAR));
-                    w.ProcessName = StringHelper::ws2s(std::wstring(szProcessName, len));
-                    if (len > 0) {
-                        WindowAttribute attributeName;
-                        attributeName.Code = std::string(S_RES_NAME);
-                        attributeName.Value = w.ProcessName;
-                        w.Attributes.emplace_back(attributeName);
-                    }
+                std::string path = w.ProcessName;
+                size_t pos = path.find_last_of("\\/");
+                if (pos != std::string::npos) {
+                    w.ProcessName = path.substr(pos + 1);
                 }
+
+                WindowAttribute attributeName;
+                attributeName.Code = std::string(S_RES_NAME);
+                attributeName.Value = w.ProcessName;
+                w.Attributes.emplace_back(attributeName);
 
 
                 HICON hIcon = (HICON) SendMessage(hwnd, WM_GETICON, ICON_BIG, 0);
@@ -521,7 +602,7 @@ namespace SL {
 
             if (visible) {
                 // check fullscreen
-                const Monitor *targetMonitor;
+                const Monitor *targetMonitor = nullptr;
                 for (const auto &monitor: *monitors) {
                     if (monitor.Frame.X == w.Position.X
                         && monitor.Frame.Y == w.Position.Y) {
@@ -540,6 +621,19 @@ namespace SL {
                     fullscreen = true;
                 }
 
+                if (!targetMonitor) {
+                    POINT p;
+                    p.x = w.Position.X;
+                    p.y = w.Position.Y;
+                    for (const auto &monitor: *monitors) {
+                        RECT monitorRect = getRect(monitor.Frame);
+                        if (::PtInRect(&monitorRect, p)) {
+                            targetMonitor = &monitor;
+                            break;
+                        }
+                    }
+                }
+
                 if (!fullscreen) {
                     auto style = GetWindowLong(hwnd, GWL_STYLE);
                     auto exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
@@ -556,12 +650,14 @@ namespace SL {
                     attributeExStyle.Code = S_RES_WINDOWS_NORMAL_EXSTYLE;
                     w.Attributes.emplace_back(attributeExStyle);
 
-                    WindowAttribute attributeNormalSize;
-                    sprintf(s, "%d;%d;%d;%d;%d;%d", w.Position.X, w.Position.Y, w.Size.Width, w.Size.Height,
-                            w.Position.X - targetMonitor->Frame.X, w.Position.Y - targetMonitor->Frame.Y);
-                    attributeNormalSize.Value = s;
-                    attributeNormalSize.Code = S_RES_NORMAL_SIZE;
-                    w.Attributes.emplace_back(attributeNormalSize);
+                    if (targetMonitor) {
+                        WindowAttribute attributeNormalSize;
+                        sprintf(s, "%d;%d;%d;%d;%d;%d", w.Position.X, w.Position.Y, w.Size.Width, w.Size.Height,
+                                w.Position.X - targetMonitor->Frame.X, w.Position.Y - targetMonitor->Frame.Y);
+                        attributeNormalSize.Value = s;
+                        attributeNormalSize.Code = S_RES_NORMAL_SIZE;
+                        w.Attributes.emplace_back(attributeNormalSize);
+                    }
 
 
                     WINDOWPLACEMENT wp;
@@ -634,7 +730,15 @@ namespace SL {
             HDC hMemDC = CreateCompatibleDC(NULL);
             HBITMAP hOldBitmap = (HBITMAP) SelectObject(hMemDC, hBitmap);
             if (DrawIconEx(hMemDC, 0, 0, hIcon, bmp.bmWidth, bmp.bmHeight, 0, NULL, DI_NORMAL)) {
-
+                auto bytes = bmi.bmiHeader.biBitCount / 8;
+                auto biSizeImage = bmp.bmWidth * bmp.bmHeight * bytes;
+                // Iterate through the bitmap data and swap the red and blue components
+                for (int i = 0; i < biSizeImage; i +=  bytes)
+                {
+                    BYTE temp = pBits[i];
+                    pBits[i] = pBits[i + 2];
+                    pBits[i + 2] = temp;
+                }
                 // Create image from bitmap data
                 unsigned char *pngData;
                 size_t outsize;
@@ -723,6 +827,15 @@ namespace SL {
                 pos = endPos + 1;
             }
             return result;
+        }
+
+        RECT getRect(const Rect &rect) {
+            RECT monitorRect;
+            monitorRect.left = rect.X;
+            monitorRect.right = rect.X + rect.Width;
+            monitorRect.top = rect.Y;
+            monitorRect.bottom = rect.Y + rect.Height;
+            return monitorRect;
         }
 
     } // namespace Screen_Capture

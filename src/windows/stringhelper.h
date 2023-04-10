@@ -335,7 +335,9 @@ public:
 
     static std::string ws2s(const std::wstring& wstr)
     {
-        return converter.to_bytes(wstr);
+        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> convert;
+        //convert to UTF8 and std::string
+        return  convert.to_bytes(wstr);
     }
 };
 

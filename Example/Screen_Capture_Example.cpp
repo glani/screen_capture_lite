@@ -21,7 +21,13 @@
 
 #include "lodepng.h"
 
-#ifndef WINDOWS
+#ifdef _WIN32
+
+#include <codecvt>
+
+#endif
+
+#ifndef _WIN32
 
 #include <unistd.h>
 
@@ -287,6 +293,7 @@ int main(int arch, char **argv) {
     gar.RetrieveIcons = true;
     auto activeWindow = SL::Screen_Capture::GetActiveWindow(gar);
 
+
     auto showingDesktopTrue = SL::Screen_Capture::ShowingDesktop(true);
     auto showingDesktopFalse = SL::Screen_Capture::ShowingDesktop(false);
 
@@ -318,27 +325,41 @@ int main(int arch, char **argv) {
             SL::Screen_Capture::MaximizeHorz(req, true);
             SL::Screen_Capture::MaximizeHorz(req, false);
         }
+
         if (fit != windows->end()) {
             SL::Screen_Capture::SingleWindowRequest req = SL::Screen_Capture::WindowToWindowRequest(*fit);
+
 //            SL::Screen_Capture::CloseAllWindows(req, false);
 //            SL::Screen_Capture::CloseWindow(req, true);
 //            SL::Screen_Capture::CloseWindow(req, true);
             //            SL::Screen_Capture::Fullscreen(req, -1, true);
             //            SL::Screen_Capture::Fullscreen(req, -1, false);
-            SL::Screen_Capture::Maximize(req, true);
-            SL::Screen_Capture::Maximize(req, false);
-            SL::Screen_Capture::Visible(req, true);
-            SL::Screen_Capture::Visible(req, false);
-            auto wnd1 = SL::Screen_Capture::Fullscreen(req, 0, true);
-            req = SL::Screen_Capture::WindowToWindowRequest(*wnd1);
-            SL::Screen_Capture::Fullscreen(req, -1, false);
-//            SL::Screen_Capture::Rectangle(req, {req.Position.X + 100, req.Position.Y + 100}, {1200, 800});
+//            SL::Screen_Capture::Maximize(req, true);
+//            for (int h = 0; h < 123; h++) {
+            SL::Screen_Capture::Activate(req);
+//            }
+
+            req = SL::Screen_Capture::WindowToWindowRequest(*fit);
+//            SL::Screen_Capture::Maximize(req, false);
+            auto wnd2 = SL::Screen_Capture::Activate(req);
+//            SL::Screen_Capture::Visible(req, true);
+//            SL::Screen_Capture::Visible(req, false);
+//            auto wnd1 = SL::Screen_Capture::Fullscreen(req, 0, true);
+//            req = SL::Screen_Capture::WindowToWindowRequest(*wnd1);
+//            SL::Screen_Capture::Fullscreen(req, -1, false);
+            auto m1 = monitors->at(0);
+            SL::Screen_Capture::Rectangle(req, {m1.VisibleFrame.X + wnd2->Frame.LeftFrame,
+                                                m1.VisibleFrame.Y + wnd2->Frame.TopFrame}, {m1.VisibleFrame.Width / 2 -
+                                                                                            (wnd2->Frame.LeftFrame +
+                                                                                             +wnd2->Frame.RightFrame),
+                                                                                            m1.VisibleFrame.Height -
+                                                                                            (wnd2->Frame.TopFrame +
+                                                                                             +wnd2->Frame.BottomFrame)});
 //            SL::Screen_Capture::Rectangle(req, {100, req.Position.Y + 100}, {1200, 800});
-            auto m1 = monitors->at(1);
-            SL::Screen_Capture::Rectangle(req, {m1.VisibleFrame.X, m1.VisibleFrame.Y + 12},
-                                          {m1.VisibleFrame.Width / 3, m1.VisibleFrame.Height / 4});
-            SL::Screen_Capture::Topmost(req);
-            int hjkl = 0;
+//            SL::Screen_Capture::Rectangle(req, {m1.VisibleFrame.X, m1.VisibleFrame.Y + 12},
+//                                          {m1.VisibleFrame.Width / 3, m1.VisibleFrame.Height / 4});
+//            SL::Screen_Capture::Topmost(req);
+//            int hjkl = 0;
 //            SL::Screen_Capture::MaximizeVert(req, true);
 ////            SL::Screen_Capture::Visible(req, false);
 ////            SL::Screen_Capture::Visible(req, true);
@@ -348,27 +369,29 @@ int main(int arch, char **argv) {
 //            SL::Screen_Capture::Maximize(req, false);
 //            SL::Screen_Capture::Fullscreen(req, -1, true);
 //            auto res = SL::Screen_Capture::Fullscreen(req, -1, false);
-            SL::Screen_Capture::Minimize(req, true);
+//            SL::Screen_Capture::Minimize(req, true);
+
         }
 
-        if (!windows->empty()) {
-            SL::Screen_Capture::SingleWindowRequest reqSingle = SL::Screen_Capture::WindowToWindowRequest(
-                    windows->front());
-            auto search = SL::Screen_Capture::GetWindow(reqSingle);
-            if (search) {
-                std::cout << "Found " << search->Name << " " << search->ProcessName << std::endl;
-            } else {
-                std::cout << "Not Found " << std::endl;
-            }
-        }
+//        if (!windows->empty()) {
+//            SL::Screen_Capture::SingleWindowRequest reqSingle = SL::Screen_Capture::WindowToWindowRequest(
+//                    windows->front());
+//            auto search = SL::Screen_Capture::GetWindow(reqSingle);
+//            if (search) {
+//                std::cout << "Found " << search->Name << " " << search->ProcessName << std::endl;
+//            } else {
+//                std::cout << "Not Found " << std::endl;
+//            }
+//        }
     }
-    request.RetrieveIcons = false;
-    gar.RetrieveIcons = false;
-    for (int i = 0; i < 100; i++) {
-        windows = SL::Screen_Capture::GetWindows(request);
 
-        activeWindow = SL::Screen_Capture::GetActiveWindow(gar);
-    }
+//    request.RetrieveIcons = false;
+//    gar.RetrieveIcons = false;
+//    for (int i = 0; i < 100; i++) {
+//        windows = SL::Screen_Capture::GetWindows(request);
+//
+//        activeWindow = SL::Screen_Capture::GetActiveWindow(gar);
+//    }
 
     // #ifndef WINDOWS
     //     while (true) {

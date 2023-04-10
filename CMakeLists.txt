@@ -226,11 +226,11 @@ install(FILES
 enable_testing()
 
 
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+#if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     #    if (LINUX OR APPLE)
     add_subdirectory(Example)
     #    endif ()
-endif (CMAKE_BUILD_TYPE STREQUAL "Debug")
+#endif (CMAKE_BUILD_TYPE STREQUAL "Debug")
 
 
 
