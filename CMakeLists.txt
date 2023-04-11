@@ -226,11 +226,21 @@ install(FILES
 enable_testing()
 
 
-#if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    #    if (LINUX OR APPLE)
-    add_subdirectory(Example)
-    #    endif ()
-#endif (CMAKE_BUILD_TYPE STREQUAL "Debug")
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    if (LINUX OR APPLE)
+        message(STATUS "Example added!")
+        add_subdirectory(Example)
+    else()
+        if (MSVC)
+            if(NO_USE_MSVC_DEFAULT_LIBS)
+                message(STATUS "Example not added!")
+            else()
+                message(STATUS "Example added!")
+                add_subdirectory(Example)
+            endif()
+        endif()
+    endif()
+endif (CMAKE_BUILD_TYPE STREQUAL "Debug")
 
 
 
