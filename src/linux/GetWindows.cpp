@@ -138,6 +138,28 @@ namespace Screen_Capture {
         }
     }
 
+    // Close all windows / terminate application
+    std::shared_ptr<EmptyResult> CloseAllWindows(const SingleWindowRequest &windowRequest, bool force) {
+        return nullptr;
+    }
+
+    // Close window
+    std::shared_ptr<EmptyResult> CloseWindow(const SingleWindowRequest &windowRequest, bool force) {
+        std::shared_ptr<Window> res;
+        XcbInitializer xcbInstance;
+        if (xcbInstance.windowExists(windowRequest.Handle)) {
+            if (force) {
+                xcbInstance.killWindow(windowRequest.Handle);
+                xcbInstance.flush();
+            } else {
+                xcbInstance.closeWindowGracefully(windowRequest.Handle);
+                xcbInstance.flush();
+            }
+            return std::make_shared<EmptyResult>();
+        }
+        return nullptr;
+    }
+
     std::shared_ptr<std::vector<Window>> GetWindows(const SearchAllWindowsRequest &request)
     {
         XcbInitializer xcbInstance;
