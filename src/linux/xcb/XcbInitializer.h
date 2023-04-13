@@ -79,7 +79,7 @@ public:
 
     void killWindow(const xcb_window_t &win);
 
-    void closeWindowGracefully(const xcb_window_t &win);
+    bool closeWindowGracefully(const xcb_window_t &win);
 
     void fullscreen(const xcb_window_t &win, bool fullscreen);
 

@@ -311,20 +311,34 @@ void XcbInitializer::killWindow(const xcb_window_t &win) {
     XKillClient(xlibDisplayValue, win);
 }
 
-void XcbInitializer::closeWindowGracefully(const xcb_window_t &win) {
-    xcb_client_message_event_t event;
+bool XcbInitializer::closeWindowGracefully(const xcb_window_t &win) {
+//    xcb_client_message_event_t event;
+//
+//    event.response_type = XCB_CLIENT_MESSAGE;
+//    event.window = win;
+//    event.type = this->atom(XcbAtom::Atom::_NET_CLOSE_WINDOW);
+//    event.format = 32;
+//    event.data.data32[0] = 1;
+//    event.data.data32[1] = XCB_CURRENT_TIME;
+//    event.data.data32[2] = XCB_NONE;
+//    event.data.data32[3] = 0;
+//    event.data.data32[4] = 0;
+//
+//    xcb_send_event_checked(xcbConnectionValue, false, rootWindowValue,
+//                   XCB_EVENT_MASK_STRUCTURE_NOTIFY | XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT,
+//                   (char *) &event);
+    XEvent xev;
+    memset(&xev, 0, sizeof(xev));
+    xev.type = ClientMessage;
+    xev.xclient.serial = 0;
+    xev.xclient.send_event = True;
+    xev.xclient.display = xlibDisplayValue;
+    xev.xclient.window = win;
+    xev.xclient.message_type = XInternAtom(xlibDisplayValue, "_NET_CLOSE_WINDOW", False);
+    xev.xclient.format = 32;
 
-    event.response_type = XCB_CLIENT_MESSAGE;
-    event.window = win;
-    event.type = this->atom(XcbAtom::Atom::_NET_CLOSE_WINDOW);
-    event.format = 32;
-    event.data.data32[0] = 1;
-    event.data.data32[1] = XCB_CURRENT_TIME;
-    event.data.data32[2] = XCB_NONE;
-    event.data.data32[3] = 0;
-    event.data.data32[4] = 0;
-
-    xcb_send_event(xcbConnectionValue, false, rootWindowValue,
-                   XCB_EVENT_MASK_STRUCTURE_NOTIFY | XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT,
-                   (char *) &event);
+    int ret = XSendEvent(xlibDisplayValue, rootWindowValue, False,
+                     SubstructureNotifyMask | SubstructureRedirectMask,
+                     &xev);
+    return ret == 0;
 }
