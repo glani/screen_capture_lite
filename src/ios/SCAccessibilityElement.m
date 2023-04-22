@@ -91,7 +91,7 @@ const CFStringRef kAXEnhancedUserInterface = @"AXEnhancedUserInterface";
 
 @implementation SCAccessibilityElement {
     AXUIElementRef _underlyingElement;
-    SCAccessibilityElement* _parent;
+    SCAccessibilityElement *_parent;
     pid_t _pid;
 }
 
@@ -172,14 +172,16 @@ const CFStringRef kAXEnhancedUserInterface = @"AXEnhancedUserInterface";
         if (result == kAXErrorSuccess) {
             return CFBridgingRelease(value);
         } else {
+#ifdef INSTA_API_DEBUG
             NSLog(@"There was a problem getting the string value of the specified attribute: %@ (error code %d)",
                   attribute, result);
+#endif
         }
     }
     return nil;
 }
 
-- (CFBooleanRef)booleanValueOfAttribute:(CFStringRef)attribute:(bool)silent {
+- (CFBooleanRef)booleanValueOfAttribute:(CFStringRef)attribute :(bool)silent {
     if (CFGetTypeID(_underlyingElement) == AXUIElementGetTypeID()) {
         CFTypeRef value;
         AXError result;
@@ -187,8 +189,10 @@ const CFStringRef kAXEnhancedUserInterface = @"AXEnhancedUserInterface";
         if (result == kAXErrorSuccess) {
             return ((CFBooleanRef *) value);
         } else {
+#ifdef INSTA_API_DEBUG
             NSLog(@"There was a problem getting the string value of the specified attribute: %@ (error code %d)",
                   attribute, result);
+#endif
         }
     }
     return nil;
@@ -248,7 +252,7 @@ const CFStringRef kAXEnhancedUserInterface = @"AXEnhancedUserInterface";
     [self setValue:sizeRef forAttribute:kAXSizeAttribute];
     [self setValue:positionRef forAttribute:kAXPositionAttribute];
     [self setValue:sizeRef forAttribute:kAXSizeAttribute];
-    
+
     if (enhancedUI != nil && enhancedUI == kCFBooleanTrue) {
         AXValueRef valueRef = kCFBooleanTrue;
         [self setValue:valueRef forAttribute:kAXEnhancedUserInterface];
@@ -285,8 +289,8 @@ const CFStringRef kAXEnhancedUserInterface = @"AXEnhancedUserInterface";
     _underlyingElement = (AXUIElementRef) CFRetain(underlyingElement);
 }
 
-- (void)setParent:(SCAccessibilityElement*)parent {
-    _parent = (SCAccessibilityElement*) CFRetain(parent);
+- (void)setParent:(SCAccessibilityElement *)parent {
+    _parent = (SCAccessibilityElement *) CFRetain(parent);
 }
 
 - (void)setPid:(pid_t)pid {
@@ -324,14 +328,14 @@ const CFStringRef kAXEnhancedUserInterface = @"AXEnhancedUserInterface";
     window.handle = cgWindowId;
 
     window.focused = nil;
-    CFBooleanRef main = [self booleanValueOfAttribute:kAXMainAttribute:false];
+    CFBooleanRef main = [self booleanValueOfAttribute:kAXMainAttribute :false];
     if (main != nil) {
         window.main = CFRetain(main);
         CFRelease(main);
     } else {
         window.main = nil;
     };
-    CFBooleanRef minimized = [self booleanValueOfAttribute:kAXMinimizedAttribute:false];
+    CFBooleanRef minimized = [self booleanValueOfAttribute:kAXMinimizedAttribute :false];
     if (minimized != nil) {
         window.minimized = CFRetain(minimized);
         CFRelease(minimized);
@@ -339,7 +343,7 @@ const CFStringRef kAXEnhancedUserInterface = @"AXEnhancedUserInterface";
         window.minimized = nil;
     };
 
-    CFBooleanRef fullscreen = [self booleanValueOfAttribute:@"AXFullScreen":false];
+    CFBooleanRef fullscreen = [self booleanValueOfAttribute:@"AXFullScreen" :false];
     if (fullscreen != nil) {
         window.fullscreen = CFRetain(fullscreen);
         CFRelease(fullscreen);
@@ -415,7 +419,7 @@ const CFStringRef kAXEnhancedUserInterface = @"AXEnhancedUserInterface";
 - (BOOL)closeWindow:(bool)force {
     CFTypeRef value = [self valueOfAttribute:kAXCloseButtonAttribute type:kAXValueTypeIllegal];
     if (value) {
-        AXUIElementRef closeButton = (AXUIElementRef)value;
+        AXUIElementRef closeButton = (AXUIElementRef) value;
         AXUIElementPerformAction(closeButton, kAXPressAction);
         CFRelease(value);
         return TRUE;
