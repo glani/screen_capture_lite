@@ -77,7 +77,12 @@ public:
 
     void maximizeHorz(const xcb_window_t &win, bool maximize);
 
+    void killWindow(const xcb_window_t &win);
+
+    bool closeWindowGracefully(const xcb_window_t &win);
+
     void fullscreen(const xcb_window_t &win, bool fullscreen);
+
 
     bool showingDesktop(bool show);
 

@@ -330,7 +330,7 @@ int main(int arch, char **argv) {
             SL::Screen_Capture::SingleWindowRequest req = SL::Screen_Capture::WindowToWindowRequest(*fit);
 
 //            SL::Screen_Capture::CloseAllWindows(req, false);
-//            SL::Screen_Capture::CloseWindow(req, true);
+            SL::Screen_Capture::CloseWindow(req, false);
 //            SL::Screen_Capture::CloseWindow(req, true);
             //            SL::Screen_Capture::Fullscreen(req, -1, true);
             //            SL::Screen_Capture::Fullscreen(req, -1, false);
