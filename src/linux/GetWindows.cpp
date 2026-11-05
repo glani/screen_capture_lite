@@ -491,7 +491,7 @@ namespace Screen_Capture {
                 w.Attributes.emplace_back(attributeMaximizedVert);
             }
             if (atoms) {
-                XFree(atoms);
+                delete[] atoms;
             }
 
             if (wr.retrieveIcon) {
@@ -679,7 +679,7 @@ namespace Screen_Capture {
             return false;
         }
         icon = base64_encode(pngData, outsize, std::string("data:image/png;base64,"), false);
-        delete[] pngData;
+        free(pngData);
 
         return true;
     }
@@ -762,7 +762,7 @@ namespace Screen_Capture {
         }
 
         if (p_size != NULL) {
-            delete p_size;
+            delete[] p_size;
         }
 
         return retval;
