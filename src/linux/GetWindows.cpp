@@ -357,6 +357,11 @@ namespace Screen_Capture {
             auto array = (XID *)data;
             for (decltype(numItems) k = 0; k < numItems; k++) {
                 auto window = array[k];
+                // None (0): e.g. _NET_ACTIVE_WINDOW when nothing has focus (an empty workspace, the desktop).
+                // Querying it breaks the X connection (Xlib aborts the process).
+                if (window == None) {
+                    continue;
+                }
                 if (retrieve(window)) {
                     addWindow(xcbInstance, window, wr, [&](const Window &wnd) { result->emplace_back(wnd); });
                 }
