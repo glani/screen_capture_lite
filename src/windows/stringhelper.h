@@ -16,6 +16,10 @@
 #include <locale>
 #include <string>
 #include <iostream>
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
 
 using convert_type = std::codecvt_utf8<wchar_t>;
 class StringHelper
@@ -333,11 +337,23 @@ public:
         return converter.from_bytes(str);
     }
 
+    // UTF-16 -> UTF-8 that never throws. std::wstring_convert::to_bytes threw std::range_error on ill-formed UTF-16
+    // (a lone surrogate, e.g. a window title cut in the middle of a surrogate pair); thrown inside the EnumWindows
+    // callback nothing caught it and the process ended (0xC0000409). WideCharToMultiByte without
+    // WC_ERR_INVALID_CHARS writes U+FFFD for such code units instead.
     static std::string ws2s(const std::wstring& wstr)
     {
-        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> convert;
-        //convert to UTF8 and std::string
-        return  convert.to_bytes(wstr);
+        if (wstr.empty()) {
+            return std::string();
+        }
+        const int length = static_cast<int>(wstr.size());
+        const int size = WideCharToMultiByte(CP_UTF8, 0, wstr.data(), length, nullptr, 0, nullptr, nullptr);
+        if (size <= 0) {
+            return std::string();
+        }
+        std::string result(static_cast<size_t>(size), '\0');
+        WideCharToMultiByte(CP_UTF8, 0, wstr.data(), length, &result[0], size, nullptr, nullptr);
+        return result;
     }
 };
 
