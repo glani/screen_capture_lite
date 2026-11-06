@@ -395,8 +395,11 @@ namespace Screen_Capture {
             w.Handle = reinterpret_cast<size_t>(window);
             w.OwnerHandle = ownerPid;
 
-            XWindowAttributes wndattr;
-            XGetWindowAttributes(display, window, &wndattr);
+            XWindowAttributes wndattr{};
+            if (!XGetWindowAttributes(display, window, &wndattr)) {
+                // The window closed after _NET_CLIENT_LIST was read: wndattr.screen would be garbage.
+                return;
+            }
 
             int xp = 0;
             int yp = 0;
