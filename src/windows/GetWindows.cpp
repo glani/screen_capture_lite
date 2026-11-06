@@ -3,6 +3,9 @@
 #include "internal/SCCommon.h"
 #include "stringhelper.h"
 #include <algorithm>
+#include <climits>
+#include <map>
+#include <mutex>
 
 #define WIN32_LEAN_AND_MEAN // Exclude rarely-used stuff from Windows headers
 
@@ -10,8 +13,10 @@
 #include <psapi.h>
 #include <shellapi.h>
 #include <ShlObj.h>
+#include <ShlDisp.h>
 #include "internal/SCShared.h"
 #include <UIAutomation.h>
+#include <wrl/client.h>
 
 #define LODEPNG_COMPILE_PNG
 #define LODEPNG_COMPILE_DISK
@@ -22,6 +27,37 @@
 
 namespace SL {
     namespace Screen_Capture {
+
+        // COM for the duration of one call on this (libuv worker) thread. CoUninitialize only if this call's
+        // CoInitializeEx succeeded (S_OK or S_FALSE both take a reference). RPC_E_CHANGED_MODE means the thread is
+        // already in another apartment (e.g. MTA): use it as it is and leave its initialisation alone.
+        class ComApartment {
+          public:
+            ComApartment() : initialized(SUCCEEDED(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED))) {}
+            ~ComApartment()
+            {
+                if (initialized) {
+                    CoUninitialize();
+                }
+            }
+            ComApartment(const ComApartment &) = delete;
+            ComApartment &operator=(const ComApartment &) = delete;
+
+          private:
+            bool initialized;
+        };
+
+        // What Fullscreen(true) changed, per window, so Fullscreen(false) can put exactly that back. The request's
+        // S_RES_WINDOWS_NORMAL_* attributes cannot do it: SMBAct's requests carry no Attributes (ssm-lib's
+        // convert() does not copy them), so they never come back here. Lives as long as the process (the renderer
+        // or the window engine); after a restart the fallback in Fullscreen(false) applies.
+        struct SavedFrame {
+            LONG Style;
+            LONG ExStyle;
+            WINDOWPLACEMENT Placement;
+        };
+        static std::mutex savedFramesMutex;
+        static std::map<HWND, SavedFrame> savedFrames;
 
         struct SearchWindows {
             std::shared_ptr<std::vector<Window>> Found;
@@ -48,14 +84,17 @@ namespace SL {
         void fillIconsIfNeeded(Window &window, HICON hIcon, bool retrieveIcons);
 
 
+        // show: minimise all windows (the shell's "Minimize all", Win+M); !show: undo that. Through the documented
+        // Shell.Application object. The old code sent Progman 0x052C (the message that spawns the wallpaper WorkerW)
+        // and WM_SETTINGCHANGE, neither of which shows the desktop, and reported success when SendMessageTimeout
+        // failed (it returns 0 on failure).
         std::shared_ptr<ShowingDesktopResult> ShowingDesktop(bool show) {
             auto result = std::make_shared<ShowingDesktopResult>();
             result->success = false;
-            HWND progman = FindWindow(L"Progman", L"Program Manager");
-            if (progman != NULL) {
-                // Send the message to show / hide the desktop
-                auto res = SendMessageTimeout(progman, show ? 0x052C : 0x001A, 0, 0, SMTO_NORMAL, 1000, NULL);
-                result->success = res == 0;
+            ComApartment com;
+            Microsoft::WRL::ComPtr<IShellDispatch> shell;
+            if (SUCCEEDED(CoCreateInstance(__uuidof(Shell), NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&shell)))) {
+                result->success = SUCCEEDED(show ? shell->MinimizeAll() : shell->UndoMinimizeALL());
             }
             return result;
         }
@@ -124,6 +163,20 @@ namespace SL {
                             if (monitorIndex != -1) {
                                 auto monitor = monitors->at(monitorIndex);
 
+                                SavedFrame saved = {};
+                                saved.Style = GetWindowLong(hwnd, GWL_STYLE);
+                                saved.ExStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+                                saved.Placement.length = sizeof(WINDOWPLACEMENT);
+                                if (GetWindowPlacement(hwnd, &saved.Placement)) {
+                                    std::lock_guard<std::mutex> lock(savedFramesMutex);
+                                    auto existing = savedFrames.find(hwnd);
+                                    // keep an existing entry if the window still looks like ours (no caption, no
+                                    // sizing border): saving that state would make it permanent
+                                    if (existing == savedFrames.end() || (saved.Style & (WS_CAPTION | WS_THICKFRAME))) {
+                                        savedFrames[hwnd] = saved;
+                                    }
+                                }
+
                                 auto maximized = !!::IsZoomed(hwnd);
                                 if (maximized) {
                                     SendMessage(hwnd, WM_SYSCOMMAND, SC_RESTORE, 0);
@@ -147,6 +200,9 @@ namespace SL {
                             }
 
                             auto wndFullscreen = getWindow(hwnd, windowRequest.RetrieveIcons, monitors.get());
+                            if (!wndFullscreen) {
+                                return nullptr;
+                            }
                             auto removeAttributes = std::remove_if(wndFullscreen->Attributes.begin(),
                                                                    wndFullscreen->Attributes.end(),
                                                                    [&](const WindowAttribute &attr) {
@@ -176,15 +232,40 @@ namespace SL {
                         ShowWindow(hwnd, SW_RESTORE);
                         ShowWindow(hwnd, SW_SHOW);
                     }
+                    SavedFrame saved = {};
+                    bool haveSaved = false;
+                    {
+                        std::lock_guard<std::mutex> lock(savedFramesMutex);
+                        auto found = savedFrames.find(hwnd);
+                        if (found != savedFrames.end()) {
+                            saved = found->second;
+                            savedFrames.erase(found);
+                            haveSaved = true;
+                        }
+                    }
+                    if (haveSaved) {
+                        // exactly what Fullscreen(true) found: styles, then the normal rectangle and show state
+                        // (maximized included)
+                        SetWindowLong(hwnd, GWL_STYLE, saved.Style);
+                        SetWindowLong(hwnd, GWL_EXSTYLE, saved.ExStyle);
+                        SetWindowPos(hwnd, NULL, 0, 0, 0, 0,
+                                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+                        SetWindowPlacement(hwnd, &saved.Placement);
+                        return getWindow(hwnd, windowRequest.RetrieveIcons, monitors.get());
+                    }
+
                     LONG style = GetWindowLong(hwnd, GWL_STYLE);
                     LONG exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
 
-                    // Set new window style and size.
+                    // Nothing saved (fullscreen entered elsewhere, or this process restarted): give back the caption
+                    // and sizing border Fullscreen(true) takes away, and the window edge that goes with a caption.
+                    // Not DLGMODALFRAME / CLIENTEDGE / STATICEDGE: OR-ing those in drew a sunken 3D border around
+                    // windows that never had one.
                     SetWindowLong(hwnd, GWL_STYLE,
                                   style | (WS_CAPTION | WS_THICKFRAME));
-                    SetWindowLong(hwnd, GWL_EXSTYLE,
-                                  exStyle | (WS_EX_DLGMODALFRAME |
-                                             WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE));
+                    SetWindowLong(hwnd, GWL_EXSTYLE, exStyle | WS_EX_WINDOWEDGE);
+                    SetWindowPos(hwnd, NULL, 0, 0, 0, 0,
+                                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
 
                     auto normalSize = std::find_if(windowRequest.Attributes.begin(), windowRequest.Attributes.end(),
                                                    [&](const WindowAttribute &attr) {
@@ -308,7 +389,9 @@ namespace SL {
             if (IsWindow(hwnd)) {
                 if (!force) {
                     // SetForegroundWindow(hwnd);
-                    SendMessage(hwnd, WM_CLOSE, 0, 0);
+                    // Posted, not sent: WM_CLOSE runs the app's close logic (a "Save changes?" dialog waits for the
+                    // user), and SendMessage waited for all of it, or for ever on a hung window, on this thread.
+                    PostMessage(hwnd, WM_CLOSE, 0, 0);
                 } else {
                     DWORD dwProcessId;
                     GetWindowThreadProcessId(hwnd, &dwProcessId);
@@ -428,6 +511,14 @@ namespace SL {
                 return TRUE;
             }
 
+            // Cloaked windows are not on screen although they are WS_VISIBLE: windows on another virtual desktop,
+            // UWP frames of suspended or closed apps (Settings, Calculator, ...). Left out of the list, like
+            // Alt+Tab does. Only here: GetWindow / GetActiveWindow on a known handle still answer for them.
+            DWORD cloaked = 0;
+            if (SUCCEEDED(DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, &cloaked, sizeof(cloaked))) && cloaked != 0) {
+                return TRUE;
+            }
+
             auto *s = reinterpret_cast<SearchWindows *>(lParam);
             auto w = getWindow(hwnd, s->RetrieveIcons, s->Monitors);
             if (w) {
@@ -437,15 +528,7 @@ namespace SL {
         }
 
         bool bringToFront(HWND hwnd) {
-            if (!SUCCEEDED(CoInitialize(nullptr))) {
-            }
-
-            IUIAutomation* uiAutomation;
-            bool result = false;
-            if (!SUCCEEDED(CoCreateInstance(__uuidof(CUIAutomation), NULL, CLSCTX_INPROC_SERVER, __uuidof(IUIAutomation), (void**)&uiAutomation)))
-            {
-                return result;
-            }
+            ComApartment com;  // declared first: released after the COM pointers below
 
             // First restore if window is minimized
 
@@ -462,20 +545,16 @@ namespace SL {
 
             // Then bring it to front using UI automation
 
-            IUIAutomationElement* window = nullptr;
-            if (SUCCEEDED(uiAutomation->ElementFromHandle(hwnd, &window)))
-            {
-                if (SUCCEEDED(window->SetFocus()))
-                {
-                    result = true;
-                }
-
-                window->Release();
+            Microsoft::WRL::ComPtr<IUIAutomation> uiAutomation;
+            if (FAILED(CoCreateInstance(__uuidof(CUIAutomation), NULL, CLSCTX_INPROC_SERVER,
+                                        IID_PPV_ARGS(&uiAutomation)))) {
+                return false;
             }
-
-            uiAutomation->Release();
-            CoUninitialize();
-            return result;
+            Microsoft::WRL::ComPtr<IUIAutomationElement> window;
+            if (FAILED(uiAutomation->ElementFromHandle(hwnd, &window)) || !window) {
+                return false;
+            }
+            return SUCCEEDED(window->SetFocus());
         }
 
         std::shared_ptr<Window> getWindow(const HWND &hwnd, bool retrieveIcons, const std::vector<Monitor> *monitors) {
@@ -488,11 +567,10 @@ namespace SL {
             w.Name = std::string();
 
             auto length = 4096;
-            auto buffer = new wchar_t[length];
-            std::unique_ptr<wchar_t> _(buffer);
-            auto textlen = GetWindowText(hwnd, buffer, length);
+            std::unique_ptr<wchar_t[]> buffer(new wchar_t[length]);  // new[] needs delete[] (was unique_ptr<wchar_t>)
+            auto textlen = GetWindowText(hwnd, buffer.get(), length);
             if (textlen >= 0) {
-                w.Name = StringHelper::ws2s(std::wstring(buffer, textlen));
+                w.Name = StringHelper::ws2s(std::wstring(buffer.get(), textlen));
             }
 
             w.Handle = reinterpret_cast<size_t>(hwnd);
@@ -518,8 +596,10 @@ namespace SL {
             wchar_t filenameBuffer[4000];
             DWORD processId;
             GetWindowThreadProcessId(hwnd, &processId);
+            // PROCESS_QUERY_LIMITED_INFORMATION is all GetProcessImageFileName / QueryFullProcessImageName need, and
+            // unlike QUERY_INFORMATION | VM_READ it is granted for elevated and protected processes too.
             auto hProcess = OpenProcess(
-                    PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, // PROCESS_QUERY_LIMITED_INFORMATION,
+                    PROCESS_QUERY_LIMITED_INFORMATION,
                     FALSE,
                     processId);
             if (hProcess != NULL) {
@@ -536,8 +616,8 @@ namespace SL {
                 }
                 TCHAR processFileName[MAX_PATH];
                 DWORD charsCarried = MAX_PATH;
-                QueryFullProcessImageName(hProcess, 0, processFileName, &charsCarried);
-                if (charsCarried) {
+                // on failure charsCarried stays MAX_PATH: do not read the uninitialised buffer then
+                if (QueryFullProcessImageName(hProcess, 0, processFileName, &charsCarried) && charsCarried) {
                     w.ProcessName = StringHelper::ws2s(std::wstring(processFileName, charsCarried));
                     WindowAttribute attributeName;
                     attributeName.Code = std::string(S_RES_START_ABSOLUTE_URL);
@@ -557,11 +637,16 @@ namespace SL {
                 w.Attributes.emplace_back(attributeName);
 
 
-                HICON hIcon = (HICON) SendMessage(hwnd, WM_GETICON, ICON_BIG, 0);
+                // WM_GETICON is answered by the window's own thread: bounded wait, or one hung window blocks this
+                // call (and the worker thread) for ever. The handle is borrowed (the window owns it), so it is not
+                // destroyed here; DestroyIcon on it destroyed the icon of SMBAct's own windows.
+                DWORD_PTR iconResult = 0;
+                HICON hIcon = NULL;
+                if (SendMessageTimeout(hwnd, WM_GETICON, ICON_BIG, 0, SMTO_ABORTIFHUNG, 100, &iconResult)) {
+                    hIcon = reinterpret_cast<HICON>(iconResult);
+                }
                 if (hIcon != NULL) {
-                    auto image = retrieveBase64IconData(hIcon);
                     fillIconsIfNeeded(w, hIcon, retrieveIcons);
-                    DestroyIcon(hIcon);
                 } else {
                     auto icons = retrieveIcon(hProcess);
                     if (icons) {
@@ -587,10 +672,13 @@ namespace SL {
             }
 
             wchar_t classNameBuffer[4000];
-            if (UINT len = GetClassName(hwnd, classNameBuffer, 4000) > 0) {
+            // Not `if (UINT len = GetClassName(...) > 0)`: that assigns the comparison, so len was 1 and res_class
+            // carried only the first letter of the class ("N" for "Notepad").
+            int classNameLength = GetClassName(hwnd, classNameBuffer, 4000);
+            if (classNameLength > 0) {
                 WindowAttribute attributeName;
                 attributeName.Code = S_RES_CLASS;
-                attributeName.Value = StringHelper::ws2s(std::wstring(classNameBuffer, len));
+                attributeName.Value = StringHelper::ws2s(std::wstring(classNameBuffer, classNameLength));
                 w.Attributes.emplace_back(attributeName);
             }
 
@@ -711,37 +799,52 @@ namespace SL {
         }
 
         std::shared_ptr<std::string> retrieveBase64IconData(HICON hIcon) {
-            ICONINFO infoIconProcess;
-            GetIconInfo(hIcon, &infoIconProcess);
+            // GetIconInfo hands out copies of the icon's bitmaps, which are ours to delete (once). If it fails,
+            // nothing was written: the old code went on and DeleteObject'ed whatever was on the stack.
+            ICONINFO infoIconProcess = {};
+            if (!GetIconInfo(hIcon, &infoIconProcess)) {
+                return nullptr;
+            }
             std::shared_ptr<std::string> result;
 
             // Create bitmap from icon data
             BITMAP bmp = {};
-            GetObject(infoIconProcess.hbmColor, sizeof(BITMAP), &bmp);
-            BITMAPINFO bmi = {};
-            bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-            bmi.bmiHeader.biWidth = bmp.bmWidth;
-            bmi.bmiHeader.biHeight = -bmp.bmHeight;
-            bmi.bmiHeader.biPlanes = 1;
-            bmi.bmiHeader.biBitCount = bmp.bmBitsPixel;
-            bmi.bmiHeader.biCompression = BI_RGB;
+            if (infoIconProcess.hbmColor != NULL) {  // no colour bitmap: a monochrome icon, not encoded
+                GetObject(infoIconProcess.hbmColor, sizeof(BITMAP), &bmp);
+            }
+            HBITMAP hBitmap = NULL;
+            HDC hMemDC = NULL;
+            HGDIOBJ hOldBitmap = NULL;
             BYTE *pBits = NULL;
-            HBITMAP hBitmap = CreateDIBSection(NULL, &bmi, DIB_RGB_COLORS, (void **) &pBits, NULL, 0);
-            HDC hMemDC = CreateCompatibleDC(NULL);
-            HBITMAP hOldBitmap = (HBITMAP) SelectObject(hMemDC, hBitmap);
-            if (DrawIconEx(hMemDC, 0, 0, hIcon, bmp.bmWidth, bmp.bmHeight, 0, NULL, DI_NORMAL)) {
-                auto bytes = bmi.bmiHeader.biBitCount / 8;
-                auto biSizeImage = bmp.bmWidth * bmp.bmHeight * bytes;
+            if (bmp.bmWidth > 0 && bmp.bmHeight > 0) {
+                BITMAPINFO bmi = {};
+                bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+                bmi.bmiHeader.biWidth = bmp.bmWidth;
+                bmi.bmiHeader.biHeight = -bmp.bmHeight;
+                bmi.bmiHeader.biPlanes = 1;
+                // Always 32 bpp: the PNG below is encoded as RGBA, i.e. reads width * height * 4 bytes. With the
+                // icon's own depth (16 or 24 bpp, e.g. a DDB on a 16-bit display) that read ran past the DIB.
+                bmi.bmiHeader.biBitCount = 32;
+                bmi.bmiHeader.biCompression = BI_RGB;
+                hBitmap = CreateDIBSection(NULL, &bmi, DIB_RGB_COLORS, (void **) &pBits, NULL, 0);
+                hMemDC = hBitmap != NULL ? CreateCompatibleDC(NULL) : NULL;
+                hOldBitmap = hMemDC != NULL ? SelectObject(hMemDC, hBitmap) : NULL;
+            }
+            if (hOldBitmap != NULL && pBits != NULL &&
+                DrawIconEx(hMemDC, 0, 0, hIcon, bmp.bmWidth, bmp.bmHeight, 0, NULL, DI_NORMAL)) {
+                GdiFlush();  // the DIB is read directly below
+                const size_t bytes = 4;
+                const size_t biSizeImage = static_cast<size_t>(bmp.bmWidth) * bmp.bmHeight * bytes;
                 // Iterate through the bitmap data and swap the red and blue components
-                for (int i = 0; i < biSizeImage; i +=  bytes)
+                for (size_t i = 0; i < biSizeImage; i += bytes)
                 {
                     BYTE temp = pBits[i];
                     pBits[i] = pBits[i + 2];
                     pBits[i + 2] = temp;
                 }
                 // Create image from bitmap data
-                unsigned char *pngData;
-                size_t outsize;
+                unsigned char *pngData = nullptr;
+                size_t outsize = 0;
                 unsigned int pngEncResult = lodepng_encode_memory(&pngData, &outsize, pBits, bmp.bmWidth, bmp.bmHeight,
                                                                   LCT_RGBA, 8);
 
@@ -751,34 +854,48 @@ namespace SL {
                     auto iconStrValue = base64_encode(pngData, outsize, std::string("data:image/png;base64,"), false);
                     result = std::make_shared<std::string>(iconStrValue);
                 }
-                delete[] pngData;
+                free(pngData);  // lodepng allocates with malloc (lodepng_malloc), not new[]
             } else {
                 result = nullptr;
             }
 
-            // Clean up
-            DeleteObject(infoIconProcess.hbmColor);
-            DeleteObject(infoIconProcess.hbmMask);
-            DeleteObject(hBitmap);
-            SelectObject(hMemDC, hOldBitmap);
-            DeleteDC(hMemDC);
+            // Clean up: deselect the DIB before deleting it (DeleteObject's contract: not while selected into a DC)
+            if (hMemDC != NULL) {
+                if (hOldBitmap != NULL) {
+                    SelectObject(hMemDC, hOldBitmap);
+                }
+                DeleteDC(hMemDC);
+            }
+            if (hBitmap != NULL) {
+                DeleteObject(hBitmap);
+            }
+            if (infoIconProcess.hbmColor != NULL) {
+                DeleteObject(infoIconProcess.hbmColor);
+            }
+            if (infoIconProcess.hbmMask != NULL) {
+                DeleteObject(infoIconProcess.hbmMask);
+            }
 
             return result;
         }
 
         std::shared_ptr<std::pair<HICON, HICON>> retrieveIcon(HANDLE hProcess) {
-            // Get the path of the executable file
+            // Get the path of the executable file (QueryFullProcessImageName: GetModuleFileNameEx needs
+            // PROCESS_VM_READ, which the handle no longer has)
             wchar_t path[MAX_PATH];
-            DWORD pathSize = GetModuleFileNameEx(hProcess, NULL, &path[0], MAX_PATH);
-
-            if (pathSize == 0) {
+            DWORD pathSize = MAX_PATH;
+            if (!QueryFullProcessImageNameW(hProcess, 0, &path[0], &pathSize) || pathSize == 0) {
                 return nullptr;
             }
 
-            // Extract the icon
-            HICON hIcon;
-            HICON hIconLarge;
-            ExtractIconEx(&path[0], 0, &hIconLarge, &hIcon, 1);
+            // Extract the icon. ExtractIconEx writes nothing when the file has no icon (returns 0) or on error
+            // (UINT_MAX); the handles were uninitialised then and went on to fillIconsIfNeeded and DestroyIcon.
+            HICON hIcon = NULL;
+            HICON hIconLarge = NULL;
+            UINT extracted = ExtractIconEx(&path[0], 0, &hIconLarge, &hIcon, 1);
+            if (extracted == 0 || extracted == UINT_MAX || (hIcon == NULL && hIconLarge == NULL)) {
+                return nullptr;
+            }
             return std::make_shared<std::pair<HICON, HICON>>(std::make_pair(hIcon, hIconLarge));
         }
 

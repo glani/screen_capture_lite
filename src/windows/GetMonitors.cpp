@@ -1,29 +1,11 @@
 #include "internal/SCCommon.h"
 #include "ScreenCapture.h"
 #include <DXGI.h>
+#include <ShellScalingApi.h>
+#pragma comment(lib, "Shcore.lib")  // GetDpiForMonitor (Windows 8.1+)
 
 namespace SL {
 namespace Screen_Capture {
-
-    float scaleFromDpi(int xdpi)
-    {
-        switch (xdpi) {
-        case 96:
-            return 1.0f;
-            break;
-        case 120:
-            return 1.25f;
-            break;
-        case 144:
-            return 1.5f;
-            break;
-        case 192:
-            return 2.0f;
-            break;
-        }
-
-        return 1.0f;
-    }
 
     RECT frameToRect(const Rect& frame) {
         RECT rect;
@@ -54,23 +36,33 @@ namespace Screen_Capture {
         HMONITOR primaryMonitor = MonitorFromPoint(POINT{0,0}, MONITOR_DEFAULTTOPRIMARY);
 
         // Create a DXGIFactory object.
+        // Stop on ANY failure, not only DXGI_ERROR_NOT_FOUND: EnumOutputs returns DXGI_ERROR_NOT_CURRENTLY_AVAILABLE
+        // in session 0 (services, SSH) without writing the output pointer, and GetDesc on that uninitialised
+        // pointer crashed the process (every GetWindows / action / displaysGeometries calls GetMonitors).
         if (SUCCEEDED(CreateDXGIFactory(__uuidof(IDXGIFactory), (void **)&pFactory))) {
-            for (UINT i = 0; pFactory->EnumAdapters(i, &pAdapter) != DXGI_ERROR_NOT_FOUND; ++i) {
-                IDXGIOutput *pOutput;
+            for (UINT i = 0; SUCCEEDED(pFactory->EnumAdapters(i, &pAdapter)); ++i) {
+                IDXGIOutput *pOutput = nullptr;
 
-                for (UINT j = 0; pAdapter->EnumOutputs(j, &pOutput) != DXGI_ERROR_NOT_FOUND; ++j) {
-                    DXGI_OUTPUT_DESC desc;
-                    pOutput->GetDesc(&desc);
+                for (UINT j = 0; SUCCEEDED(pAdapter->EnumOutputs(j, &pOutput)); ++j) {
+                    DXGI_OUTPUT_DESC desc = {};
+                    HRESULT descResult = pOutput->GetDesc(&desc);
                     pOutput->Release();
+                    pOutput = nullptr;
+                    DEVMODEW devMode = {};
+                    devMode.dmSize = sizeof(devMode);
+                    if (FAILED(descResult) || !EnumDisplaySettingsW(desc.DeviceName, ENUM_CURRENT_SETTINGS, &devMode)) {
+                        continue;
+                    }
                     std::wstring wname = desc.DeviceName;
                     std::string name(wname.begin(), wname.end());
-                    DEVMODEW devMode;
-                    EnumDisplaySettingsW(desc.DeviceName, ENUM_CURRENT_SETTINGS, &devMode);
 
-                    auto mon = CreateDCW(desc.DeviceName, NULL, NULL, NULL);
-                    auto xdpi = GetDeviceCaps(mon, LOGPIXELSX);
-                    DeleteDC(mon);
-                    auto scale = scaleFromDpi(xdpi);
+                    // The monitor's own effective DPI. GetDeviceCaps(LOGPIXELSX) is the SYSTEM DPI in a per-monitor
+                    // aware process (Electron is), and scaleFromDpi knew only 96/120/144/192 (else 1.0): 175 % or
+                    // a second monitor at another scale came out wrong.
+                    UINT dpiX = 96, dpiY = 96;
+                    auto scale = SUCCEEDED(GetDpiForMonitor(desc.Monitor, MDT_EFFECTIVE_DPI, &dpiX, &dpiY))
+                                     ? static_cast<float>(dpiX) / 96.0f
+                                     : 1.0f;
 
                     bool flipSides = desc.Rotation == DXGI_MODE_ROTATION_ROTATE90 || desc.Rotation == DXGI_MODE_ROTATION_ROTATE270;
                     Monitor monitor = CreateMonitor(static_cast<int>(ret->size()), j, i,
