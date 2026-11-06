@@ -101,5 +101,4 @@ public:
     xcb_connection_t *xcbConnectionValue = nullptr;
     XcbAtom xcbAtomValue;
     const xcb_setup_t *setupValues = nullptr;
-    void setWindowState(const xcb_window_t &win, uint32_t state);
 };

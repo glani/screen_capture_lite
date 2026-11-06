@@ -189,17 +189,14 @@ bool XcbInitializer::windowExists(const xcb_window_t &win) const {
 }
 
 void XcbInitializer::visible(const xcb_window_t &win, bool visible) {
-    uint32_t values_off[] = {ROOT_EVENT_MASK & ~XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY};
-    uint32_t values_on[] = {ROOT_EVENT_MASK};
-    xcb_change_window_attributes(xcbConnectionValue, rootWindow(), XCB_CW_EVENT_MASK, values_off);
+    // A plain map / unmap. WM_STATE belongs to the window manager (ICCCM), so it is not written here; nor is the
+    // root's event mask touched (selecting SubstructureRedirect on the root fails with BadAccess under any window
+    // manager, and without one it made this connection the redirect owner).
     if (visible) {
-        setWindowState(win, XCB_ICCCM_WM_STATE_ICONIC);
         xcb_map_window(xcbConnectionValue, win);
     } else {
         xcb_unmap_window(xcbConnectionValue, win);
-        setWindowState(win, XCB_ICCCM_WM_STATE_ICONIC);
     }
-    xcb_change_window_attributes(xcbConnectionValue, rootWindow(), XCB_CW_EVENT_MASK, values_on);
 }
 
 xcb_timestamp_t XcbInitializer::serverTime() {
@@ -271,12 +268,6 @@ void XcbInitializer::activate(const xcb_window_t &win) {
     const static uint32_t values[] = {XCB_STACK_MODE_ABOVE};
     xcb_map_window(xcbConnectionValue, win);
     xcb_configure_window(xcbConnectionValue, win, XCB_CONFIG_WINDOW_STACK_MODE, values);
-}
-
-void XcbInitializer::setWindowState(const xcb_window_t &win, uint32_t state) {
-    long data[] = {state, XCB_NONE};
-    const xcb_atom_t &wmState = atom(XcbAtom::WM_STATE);
-    xcb_change_property(xcbConnectionValue, XCB_PROP_MODE_REPLACE, win, wmState, wmState, 32, 2, data);
 }
 
 void XcbInitializer::maximize(const xcb_window_t &win, bool maximize) {
