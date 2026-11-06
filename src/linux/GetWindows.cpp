@@ -185,7 +185,7 @@ namespace Screen_Capture {
             xcbInstance.fullscreen(windowRequest.Handle, fullscreen);
             xcbInstance.flush();
             struct _WindowRequest wr;
-            wr.retrieveIcon = windowRequest.Handle;
+            wr.retrieveIcon = windowRequest.RetrieveIcons;
             XID window = static_cast<XID>(windowRequest.Handle);
             addWindow(xcbInstance, window, wr, [&](const Window &wnd) { res = std::make_shared<Window>(wnd); });
         }
@@ -201,7 +201,7 @@ namespace Screen_Capture {
             xcbInstance.minimize(windowRequest.Handle, minimize);
             xcbInstance.flush();
             struct _WindowRequest wr;
-            wr.retrieveIcon = windowRequest.Handle;
+            wr.retrieveIcon = windowRequest.RetrieveIcons;
             XID window = static_cast<XID>(windowRequest.Handle);
             addWindow(xcbInstance, window, wr, [&](const Window &wnd) { res = std::make_shared<Window>(wnd); });
         }
@@ -219,7 +219,7 @@ namespace Screen_Capture {
             xcbInstance.maximize(windowRequest.Handle, maximize);
             xcbInstance.flush();
             struct _WindowRequest wr;
-            wr.retrieveIcon = windowRequest.Handle;
+            wr.retrieveIcon = windowRequest.RetrieveIcons;
             XID window = static_cast<XID>(windowRequest.Handle);
             addWindow(xcbInstance, window, wr, [&](const Window &wnd) { res = std::make_shared<Window>(wnd); });
         }
@@ -237,7 +237,7 @@ namespace Screen_Capture {
             xcbInstance.maximizeHorz(windowRequest.Handle, maximize);
             xcbInstance.flush();
             struct _WindowRequest wr;
-            wr.retrieveIcon = windowRequest.Handle;
+            wr.retrieveIcon = windowRequest.RetrieveIcons;
             XID window = static_cast<XID>(windowRequest.Handle);
             addWindow(xcbInstance, window, wr, [&](const Window &wnd) { res = std::make_shared<Window>(wnd); });
         }
@@ -255,7 +255,7 @@ namespace Screen_Capture {
             xcbInstance.maximizeVert(windowRequest.Handle, maximize);
             xcbInstance.flush();
             struct _WindowRequest wr;
-            wr.retrieveIcon = windowRequest.Handle;
+            wr.retrieveIcon = windowRequest.RetrieveIcons;
             XID window = static_cast<XID>(windowRequest.Handle);
             addWindow(xcbInstance, window, wr, [&](const Window &wnd) { res = std::make_shared<Window>(wnd); });
         }
@@ -272,7 +272,7 @@ namespace Screen_Capture {
             xcbInstance.visible(windowRequest.Handle, visible);
             xcbInstance.flush();
             struct _WindowRequest wr;
-            wr.retrieveIcon = windowRequest.Handle;
+            wr.retrieveIcon = windowRequest.RetrieveIcons;
             XID window = static_cast<XID>(windowRequest.Handle);
             addWindow(xcbInstance, window, wr, [&](const Window &wnd) { res = std::make_shared<Window>(wnd); });
         }
@@ -289,7 +289,7 @@ namespace Screen_Capture {
             xcbInstance.flush();
 
             struct _WindowRequest wr;
-            wr.retrieveIcon = windowRequest.Handle;
+            wr.retrieveIcon = windowRequest.RetrieveIcons;
 
             XID window = static_cast<XID>(windowRequest.Handle);
             addWindow(xcbInstance, window, wr, [&](const Window &wnd) { res = std::make_shared<Window>(wnd); });
@@ -321,7 +321,7 @@ namespace Screen_Capture {
             xcbInstance.flush();
 
             struct _WindowRequest wr;
-            wr.retrieveIcon = windowRequest.Handle;
+            wr.retrieveIcon = windowRequest.RetrieveIcons;
 
             XID window = static_cast<XID>(windowRequest.Handle);
             addWindow(xcbInstance, window, wr, [&](const Window &wnd) { res = std::make_shared<Window>(wnd); });
