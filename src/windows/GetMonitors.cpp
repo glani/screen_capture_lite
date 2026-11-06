@@ -54,18 +54,25 @@ namespace Screen_Capture {
         HMONITOR primaryMonitor = MonitorFromPoint(POINT{0,0}, MONITOR_DEFAULTTOPRIMARY);
 
         // Create a DXGIFactory object.
+        // Stop on ANY failure, not only DXGI_ERROR_NOT_FOUND: EnumOutputs returns DXGI_ERROR_NOT_CURRENTLY_AVAILABLE
+        // in session 0 (services, SSH) without writing the output pointer, and GetDesc on that uninitialised
+        // pointer crashed the process (every GetWindows / action / displaysGeometries calls GetMonitors).
         if (SUCCEEDED(CreateDXGIFactory(__uuidof(IDXGIFactory), (void **)&pFactory))) {
-            for (UINT i = 0; pFactory->EnumAdapters(i, &pAdapter) != DXGI_ERROR_NOT_FOUND; ++i) {
-                IDXGIOutput *pOutput;
+            for (UINT i = 0; SUCCEEDED(pFactory->EnumAdapters(i, &pAdapter)); ++i) {
+                IDXGIOutput *pOutput = nullptr;
 
-                for (UINT j = 0; pAdapter->EnumOutputs(j, &pOutput) != DXGI_ERROR_NOT_FOUND; ++j) {
-                    DXGI_OUTPUT_DESC desc;
-                    pOutput->GetDesc(&desc);
+                for (UINT j = 0; SUCCEEDED(pAdapter->EnumOutputs(j, &pOutput)); ++j) {
+                    DXGI_OUTPUT_DESC desc = {};
+                    HRESULT descResult = pOutput->GetDesc(&desc);
                     pOutput->Release();
+                    pOutput = nullptr;
+                    DEVMODEW devMode = {};
+                    devMode.dmSize = sizeof(devMode);
+                    if (FAILED(descResult) || !EnumDisplaySettingsW(desc.DeviceName, ENUM_CURRENT_SETTINGS, &devMode)) {
+                        continue;
+                    }
                     std::wstring wname = desc.DeviceName;
                     std::string name(wname.begin(), wname.end());
-                    DEVMODEW devMode;
-                    EnumDisplaySettingsW(desc.DeviceName, ENUM_CURRENT_SETTINGS, &devMode);
 
                     auto mon = CreateDCW(desc.DeviceName, NULL, NULL, NULL);
                     auto xdpi = GetDeviceCaps(mon, LOGPIXELSX);
