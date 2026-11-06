@@ -412,8 +412,14 @@ namespace Screen_Capture {
             w.Size = SizeValues(wndattr.width, wndattr.height);
             w.Name = name;
 
-            XClassHint hint;
-            XGetClassHint(display, window, &hint);
+            // WM_CLASS is optional (Wine, some Java/Tk and hand-written X clients have none). On failure XGetClassHint
+            // returns 0 and leaves the fields untouched, so they must start as NULL, and only a success hands us
+            // strings to XFree (freeing stale pointers here was a double free that killed the process).
+            XClassHint hint = {nullptr, nullptr};
+            if (!XGetClassHint(display, window, &hint)) {
+                hint.res_name = nullptr;
+                hint.res_class = nullptr;
+            }
             WindowAttribute attributeClass;
             attributeClass.Code = std::string(S_RES_CLASS);
             attributeClass.Value = hint.res_class != NULL ? std::string(hint.res_class) : ""s;
@@ -426,8 +432,12 @@ namespace Screen_Capture {
 
             w.ProcessName = attributeName.Value;
 
-            XFree(hint.res_class);
-            XFree(hint.res_name);
+            if (hint.res_class) {
+                XFree(hint.res_class);
+            }
+            if (hint.res_name) {
+                XFree(hint.res_name);
+            }
 
             if (!exec.empty()) {
                 WindowAttribute attributeExec;
