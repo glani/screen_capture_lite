@@ -587,10 +587,13 @@ namespace SL {
             }
 
             wchar_t classNameBuffer[4000];
-            if (UINT len = GetClassName(hwnd, classNameBuffer, 4000) > 0) {
+            // Not `if (UINT len = GetClassName(...) > 0)`: that assigns the comparison, so len was 1 and res_class
+            // carried only the first letter of the class ("N" for "Notepad").
+            int classNameLength = GetClassName(hwnd, classNameBuffer, 4000);
+            if (classNameLength > 0) {
                 WindowAttribute attributeName;
                 attributeName.Code = S_RES_CLASS;
-                attributeName.Value = StringHelper::ws2s(std::wstring(classNameBuffer, len));
+                attributeName.Value = StringHelper::ws2s(std::wstring(classNameBuffer, classNameLength));
                 w.Attributes.emplace_back(attributeName);
             }
 
