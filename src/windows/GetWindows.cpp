@@ -4,6 +4,7 @@
 #include "stringhelper.h"
 #include <algorithm>
 #include <climits>
+#include <cstring>
 #include <map>
 #include <mutex>
 
@@ -637,9 +638,24 @@ namespace SL {
             return nullptr;
         }
 
-        // Native window info
+        // Native window info: data is what Electron's BrowserWindow.getNativeWindowHandle() returns, the HWND
+        // (sizeof(HWND) bytes). Linux reads the X window id the same way; macOS turns an NSView* into the window number.
+        // Handle = the HWND, OwnerHandle = its process id (as getWindow reports them). It returned nullptr before.
         std::shared_ptr<NativeWindow> NativeWindowInfo(char *data, const size_t sz) {
-            return nullptr;
+            if (data == nullptr || sz < sizeof(HWND)) {
+                return nullptr;
+            }
+            HWND hwnd = nullptr;
+            memcpy(&hwnd, data, sizeof(hwnd));
+            if (!IsWindow(hwnd)) {
+                return nullptr;
+            }
+            DWORD pid = 0;
+            GetWindowThreadProcessId(hwnd, &pid);
+            auto window = std::make_shared<NativeWindow>();
+            window->Handle = reinterpret_cast<size_t>(hwnd);
+            window->OwnerHandle = pid;
+            return window;
         }
 
         // will return active window
