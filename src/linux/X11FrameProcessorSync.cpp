@@ -14,8 +14,7 @@ namespace SL {
         X11FrameProcessorSync::~X11FrameProcessorSync() {
 
             if (ShmInfo) {
-                shmdt(ShmInfo->shmaddr);
-                shmctl(ShmInfo->shmid, IPC_RMID, 0);
+                shmdt(ShmInfo->shmaddr); // the segment was marked for removal in Init
                 XShmDetach(SelectedDisplay, ShmInfo.get());
             }
             if (XImage_) {
@@ -46,12 +45,16 @@ namespace SL {
                                       ShmInfo.get(),
                                       Width(SelectedMonitor),
                                       Height(SelectedMonitor));
-            ShmInfo->shmid = shmget(IPC_PRIVATE, XImage_->bytes_per_line * XImage_->height, IPC_CREAT | 0777);
+            ShmInfo->shmid = shmget(IPC_PRIVATE, XImage_->bytes_per_line * XImage_->height, IPC_CREAT | 0600);
 
             ShmInfo->readOnly = False;
             ShmInfo->shmaddr = XImage_->data = (char *) shmat(ShmInfo->shmid, 0, 0);
 
             XShmAttach(SelectedDisplay, ShmInfo.get());
+            // Mark the segment for removal as soon as the server has attached it (XSync first, or the server's
+            // attach could fail): the kernel frees it when the last user detaches, also when this process is killed.
+            XSync(SelectedDisplay, False);
+            shmctl(ShmInfo->shmid, IPC_RMID, 0);
 
             return ret;
         }
