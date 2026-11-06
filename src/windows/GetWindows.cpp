@@ -13,6 +13,7 @@
 #include <ShlObj.h>
 #include "internal/SCShared.h"
 #include <UIAutomation.h>
+#include <wrl/client.h>
 
 #define LODEPNG_COMPILE_PNG
 #define LODEPNG_COMPILE_DISK
@@ -23,6 +24,25 @@
 
 namespace SL {
     namespace Screen_Capture {
+
+        // COM for the duration of one call on this (libuv worker) thread. CoUninitialize only if this call's
+        // CoInitializeEx succeeded (S_OK or S_FALSE both take a reference). RPC_E_CHANGED_MODE means the thread is
+        // already in another apartment (e.g. MTA): use it as it is and leave its initialisation alone.
+        class ComApartment {
+          public:
+            ComApartment() : initialized(SUCCEEDED(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED))) {}
+            ~ComApartment()
+            {
+                if (initialized) {
+                    CoUninitialize();
+                }
+            }
+            ComApartment(const ComApartment &) = delete;
+            ComApartment &operator=(const ComApartment &) = delete;
+
+          private:
+            bool initialized;
+        };
 
         struct SearchWindows {
             std::shared_ptr<std::vector<Window>> Found;
@@ -448,15 +468,7 @@ namespace SL {
         }
 
         bool bringToFront(HWND hwnd) {
-            if (!SUCCEEDED(CoInitialize(nullptr))) {
-            }
-
-            IUIAutomation* uiAutomation;
-            bool result = false;
-            if (!SUCCEEDED(CoCreateInstance(__uuidof(CUIAutomation), NULL, CLSCTX_INPROC_SERVER, __uuidof(IUIAutomation), (void**)&uiAutomation)))
-            {
-                return result;
-            }
+            ComApartment com;  // declared first: released after the COM pointers below
 
             // First restore if window is minimized
 
@@ -473,20 +485,16 @@ namespace SL {
 
             // Then bring it to front using UI automation
 
-            IUIAutomationElement* window = nullptr;
-            if (SUCCEEDED(uiAutomation->ElementFromHandle(hwnd, &window)))
-            {
-                if (SUCCEEDED(window->SetFocus()))
-                {
-                    result = true;
-                }
-
-                window->Release();
+            Microsoft::WRL::ComPtr<IUIAutomation> uiAutomation;
+            if (FAILED(CoCreateInstance(__uuidof(CUIAutomation), NULL, CLSCTX_INPROC_SERVER,
+                                        IID_PPV_ARGS(&uiAutomation)))) {
+                return false;
             }
-
-            uiAutomation->Release();
-            CoUninitialize();
-            return result;
+            Microsoft::WRL::ComPtr<IUIAutomationElement> window;
+            if (FAILED(uiAutomation->ElementFromHandle(hwnd, &window)) || !window) {
+                return false;
+            }
+            return SUCCEEDED(window->SetFocus());
         }
 
         std::shared_ptr<Window> getWindow(const HWND &hwnd, bool retrieveIcons, const std::vector<Monitor> *monitors) {
