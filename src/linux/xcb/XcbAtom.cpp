@@ -228,7 +228,8 @@ void XcbAtom::initializeAllAtoms(xcb_connection_t *connection) {
 
     for (i = 0; i < XcbAtom::NAtoms; ++i) {
         xcb_intern_atom_reply_t *reply = xcb_intern_atom_reply(connection, cookies[i], nullptr);
-        m_allAtoms[i] = reply->atom;
+        // No reply when the connection broke: keep None instead of dereferencing NULL.
+        m_allAtoms[i] = reply ? reply->atom : XCB_ATOM_NONE;
         free(reply);
     }
 }

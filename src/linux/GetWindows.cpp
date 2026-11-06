@@ -118,6 +118,9 @@ namespace Screen_Capture {
     std::shared_ptr<Window> GetActiveWindow(const SharedWindowsRequest &request)
     {
         XcbInitializer xcbInstance;
+        if (!xcbInstance.isValid()) {
+            return std::shared_ptr<Window>();
+        }
         auto res = getWindows(xcbInstance, std::string("_NET_ACTIVE_WINDOW"), request.RetrieveIcons, [&](const XID &id) { return true; });
         if (!res->empty()) {
             return std::make_shared<Window>(res->front());
@@ -130,6 +133,9 @@ namespace Screen_Capture {
     std::shared_ptr<Window> GetWindow(const SingleWindowRequest &request)
     {
         XcbInitializer xcbInstance;
+        if (!xcbInstance.isValid()) {
+            return std::shared_ptr<Window>();
+        }
         auto res = getWindows(xcbInstance, std::string("_NET_CLIENT_LIST"), request.RetrieveIcons,
                               [&](const XID &id) { return reinterpret_cast<XID>(request.Handle) == id; });
         if (!res->empty()) {
@@ -147,9 +153,8 @@ namespace Screen_Capture {
 
     // Close window
     std::shared_ptr<EmptyResult> CloseWindow(const SingleWindowRequest &windowRequest, bool force) {
-        std::shared_ptr<Window> res;
         XcbInitializer xcbInstance;
-        if (xcbInstance.windowExists(windowRequest.Handle)) {
+        if (xcbInstance.isValid() && xcbInstance.windowExists(windowRequest.Handle)) {
             if (force) {
                 xcbInstance.killWindow(windowRequest.Handle);
                 xcbInstance.flush();
@@ -165,6 +170,9 @@ namespace Screen_Capture {
     std::shared_ptr<std::vector<Window>> GetWindows(const SearchAllWindowsRequest &request)
     {
         XcbInitializer xcbInstance;
+        if (!xcbInstance.isValid()) {
+            return std::make_shared<std::vector<Window>>();
+        }
         return getWindows(xcbInstance, std::string("_NET_CLIENT_LIST_STACKING"), request.RetrieveIcons, [&](const XID &id) { return true; });
     }
 
@@ -173,7 +181,7 @@ namespace Screen_Capture {
     {
         std::shared_ptr<Window> res;
         XcbInitializer xcbInstance;
-        if (xcbInstance.windowExists(windowRequest.Handle)) {
+        if (xcbInstance.isValid() && xcbInstance.windowExists(windowRequest.Handle)) {
             xcbInstance.fullscreen(windowRequest.Handle, fullscreen);
             xcbInstance.flush();
             struct _WindowRequest wr;
@@ -189,7 +197,7 @@ namespace Screen_Capture {
     {
         std::shared_ptr<Window> res;
         XcbInitializer xcbInstance;
-        if (xcbInstance.windowExists(windowRequest.Handle)) {
+        if (xcbInstance.isValid() && xcbInstance.windowExists(windowRequest.Handle)) {
             xcbInstance.minimize(windowRequest.Handle, minimize);
             xcbInstance.flush();
             struct _WindowRequest wr;
@@ -207,7 +215,7 @@ namespace Screen_Capture {
         std::shared_ptr<Window> res;
         XcbInitializer xcbInstance;
 
-        if (xcbInstance.windowExists(windowRequest.Handle)) {
+        if (xcbInstance.isValid() && xcbInstance.windowExists(windowRequest.Handle)) {
             xcbInstance.maximize(windowRequest.Handle, maximize);
             xcbInstance.flush();
             struct _WindowRequest wr;
@@ -225,7 +233,7 @@ namespace Screen_Capture {
         std::shared_ptr<Window> res;
         XcbInitializer xcbInstance;
 
-        if (xcbInstance.windowExists(windowRequest.Handle)) {
+        if (xcbInstance.isValid() && xcbInstance.windowExists(windowRequest.Handle)) {
             xcbInstance.maximizeHorz(windowRequest.Handle, maximize);
             xcbInstance.flush();
             struct _WindowRequest wr;
@@ -243,7 +251,7 @@ namespace Screen_Capture {
         std::shared_ptr<Window> res;
         XcbInitializer xcbInstance;
 
-        if (xcbInstance.windowExists(windowRequest.Handle)) {
+        if (xcbInstance.isValid() && xcbInstance.windowExists(windowRequest.Handle)) {
             xcbInstance.maximizeVert(windowRequest.Handle, maximize);
             xcbInstance.flush();
             struct _WindowRequest wr;
@@ -260,7 +268,7 @@ namespace Screen_Capture {
     {
         std::shared_ptr<Window> res;
         XcbInitializer xcbInstance;
-        if (xcbInstance.windowExists(windowRequest.Handle)) {
+        if (xcbInstance.isValid() && xcbInstance.windowExists(windowRequest.Handle)) {
             xcbInstance.visible(windowRequest.Handle, visible);
             xcbInstance.flush();
             struct _WindowRequest wr;
@@ -276,7 +284,7 @@ namespace Screen_Capture {
     {
         std::shared_ptr<Window> res;
         XcbInitializer xcbInstance;
-        if (xcbInstance.windowExists(windowRequest.Handle)) {
+        if (xcbInstance.isValid() && xcbInstance.windowExists(windowRequest.Handle)) {
             xcbInstance.rectangle(windowRequest.Handle, position, size);
             xcbInstance.flush();
 
@@ -307,7 +315,7 @@ namespace Screen_Capture {
     {
         std::shared_ptr<Window> res;
         XcbInitializer xcbInstance;
-        if (xcbInstance.windowExists(windowRequest.Handle)) {
+        if (xcbInstance.isValid() && xcbInstance.windowExists(windowRequest.Handle)) {
             xcbInstance.visible(windowRequest.Handle, true);
             xcbInstance.activate(windowRequest.Handle);
             xcbInstance.flush();
@@ -327,7 +335,9 @@ namespace Screen_Capture {
         std::shared_ptr<ShowingDesktopResult> res = std::make_shared<ShowingDesktopResult>();
         res->success = false;
         XcbInitializer xcbInstance;
-//        auto &xcbInstance = XcbInitializer::getInstance();
+        if (!xcbInstance.isValid()) {
+            return res;
+        }
         if (xcbInstance.showingDesktop(show)) {
             res->success = true;
         }

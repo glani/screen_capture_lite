@@ -45,6 +45,8 @@ public:
     const xcb_setup_t *setup() const { return setupValues; }
 
     bool isConnected() const { return xcbConnectionValue && !xcb_connection_has_error(xcbConnectionValue); }
+    // Both connections (Xlib and xcb) are up. False when no X server is reachable: callers must not use the object then.
+    bool isValid() const { return xlibDisplayValue && isConnected(); }
     xcb_connection_t *xcbConnection() const { return xcbConnectionValue; }
 
 //    static XcbInitializer &getInstance();
@@ -89,9 +91,9 @@ public:
   private:
     int primaryScreenNumberValue = -1;
     Display *xlibDisplayValue = nullptr;
-    XID rootWindowValue;
+    XID rootWindowValue = 0;
     xcb_connection_t *xcbConnectionValue = nullptr;
     XcbAtom xcbAtomValue;
-    const xcb_setup_t *setupValues;
+    const xcb_setup_t *setupValues = nullptr;
     void setWindowState(const xcb_window_t &win, uint32_t state);
 };

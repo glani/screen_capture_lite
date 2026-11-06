@@ -67,10 +67,13 @@ XcbInitializer::XcbInitializer() {
 }
 
 XcbInitializer::~XcbInitializer() {
-    if (isConnected()) {
+    if (xcbConnectionValue) {
+        // Also for a connection in an error state: xcb_disconnect frees it (and is a no-op for xcb's static error objects).
         xcb_disconnect(xcbConnectionValue);
     }
-    XCloseDisplay(xlibDisplayValue);
+    if (xlibDisplayValue) {
+        XCloseDisplay(xlibDisplayValue);
+    }
 }
 
 void XcbInitializer::init() {
@@ -84,6 +87,11 @@ void XcbInitializer::init() {
         primaryScreenNumberValue = DefaultScreen(dpy);
     }
     xcbConnectionValue = xcb_connect(NULL, NULL);
+    if (!isValid()) {
+        // No reachable X server (DISPLAY unset or wrong, the server gone). Every public function checks isValid()
+        // and returns an empty result instead of dereferencing a NULL display or a failed reply.
+        return;
+    }
     setupValues = xcb_get_setup(xcbConnectionValue);
     xcbAtomValue.initialize(xcbConnectionValue);
 }
@@ -92,7 +100,8 @@ xcb_atom_t XcbInitializer::internAtom(const char *name) {
     if (!name || *name == 0)
         return XCB_NONE;
 
-    return XCB_REPLY(xcb_intern_atom, xcbConnection(), false, strlen(name), name)->atom;
+    auto reply = XCB_REPLY(xcb_intern_atom, xcbConnection(), false, strlen(name), name);
+    return reply ? reply->atom : XCB_NONE;
 }
 
 std::string XcbInitializer::atomName(xcb_atom_t atom) {
