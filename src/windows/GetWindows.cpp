@@ -4,6 +4,8 @@
 #include "stringhelper.h"
 #include <algorithm>
 #include <climits>
+#include <map>
+#include <mutex>
 
 #define WIN32_LEAN_AND_MEAN // Exclude rarely-used stuff from Windows headers
 
@@ -44,6 +46,18 @@ namespace SL {
           private:
             bool initialized;
         };
+
+        // What Fullscreen(true) changed, per window, so Fullscreen(false) can put exactly that back. The request's
+        // S_RES_WINDOWS_NORMAL_* attributes cannot do it: SMBAct's requests carry no Attributes (ssm-lib's
+        // convert() does not copy them), so they never come back here. Lives as long as the process (the renderer
+        // or the window engine); after a restart the fallback in Fullscreen(false) applies.
+        struct SavedFrame {
+            LONG Style;
+            LONG ExStyle;
+            WINDOWPLACEMENT Placement;
+        };
+        static std::mutex savedFramesMutex;
+        static std::map<HWND, SavedFrame> savedFrames;
 
         struct SearchWindows {
             std::shared_ptr<std::vector<Window>> Found;
@@ -149,6 +163,20 @@ namespace SL {
                             if (monitorIndex != -1) {
                                 auto monitor = monitors->at(monitorIndex);
 
+                                SavedFrame saved = {};
+                                saved.Style = GetWindowLong(hwnd, GWL_STYLE);
+                                saved.ExStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+                                saved.Placement.length = sizeof(WINDOWPLACEMENT);
+                                if (GetWindowPlacement(hwnd, &saved.Placement)) {
+                                    std::lock_guard<std::mutex> lock(savedFramesMutex);
+                                    auto existing = savedFrames.find(hwnd);
+                                    // keep an existing entry if the window still looks like ours (no caption, no
+                                    // sizing border): saving that state would make it permanent
+                                    if (existing == savedFrames.end() || (saved.Style & (WS_CAPTION | WS_THICKFRAME))) {
+                                        savedFrames[hwnd] = saved;
+                                    }
+                                }
+
                                 auto maximized = !!::IsZoomed(hwnd);
                                 if (maximized) {
                                     SendMessage(hwnd, WM_SYSCOMMAND, SC_RESTORE, 0);
@@ -172,6 +200,9 @@ namespace SL {
                             }
 
                             auto wndFullscreen = getWindow(hwnd, windowRequest.RetrieveIcons, monitors.get());
+                            if (!wndFullscreen) {
+                                return nullptr;
+                            }
                             auto removeAttributes = std::remove_if(wndFullscreen->Attributes.begin(),
                                                                    wndFullscreen->Attributes.end(),
                                                                    [&](const WindowAttribute &attr) {
@@ -201,15 +232,40 @@ namespace SL {
                         ShowWindow(hwnd, SW_RESTORE);
                         ShowWindow(hwnd, SW_SHOW);
                     }
+                    SavedFrame saved = {};
+                    bool haveSaved = false;
+                    {
+                        std::lock_guard<std::mutex> lock(savedFramesMutex);
+                        auto found = savedFrames.find(hwnd);
+                        if (found != savedFrames.end()) {
+                            saved = found->second;
+                            savedFrames.erase(found);
+                            haveSaved = true;
+                        }
+                    }
+                    if (haveSaved) {
+                        // exactly what Fullscreen(true) found: styles, then the normal rectangle and show state
+                        // (maximized included)
+                        SetWindowLong(hwnd, GWL_STYLE, saved.Style);
+                        SetWindowLong(hwnd, GWL_EXSTYLE, saved.ExStyle);
+                        SetWindowPos(hwnd, NULL, 0, 0, 0, 0,
+                                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+                        SetWindowPlacement(hwnd, &saved.Placement);
+                        return getWindow(hwnd, windowRequest.RetrieveIcons, monitors.get());
+                    }
+
                     LONG style = GetWindowLong(hwnd, GWL_STYLE);
                     LONG exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
 
-                    // Set new window style and size.
+                    // Nothing saved (fullscreen entered elsewhere, or this process restarted): give back the caption
+                    // and sizing border Fullscreen(true) takes away, and the window edge that goes with a caption.
+                    // Not DLGMODALFRAME / CLIENTEDGE / STATICEDGE: OR-ing those in drew a sunken 3D border around
+                    // windows that never had one.
                     SetWindowLong(hwnd, GWL_STYLE,
                                   style | (WS_CAPTION | WS_THICKFRAME));
-                    SetWindowLong(hwnd, GWL_EXSTYLE,
-                                  exStyle | (WS_EX_DLGMODALFRAME |
-                                             WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE));
+                    SetWindowLong(hwnd, GWL_EXSTYLE, exStyle | WS_EX_WINDOWEDGE);
+                    SetWindowPos(hwnd, NULL, 0, 0, 0, 0,
+                                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
 
                     auto normalSize = std::find_if(windowRequest.Attributes.begin(), windowRequest.Attributes.end(),
                                                    [&](const WindowAttribute &attr) {
