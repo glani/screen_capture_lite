@@ -364,7 +364,9 @@ namespace Screen_Capture {
         unsigned char *data = 0;
         int status = XGetWindowProperty(display, XDefaultRootWindow(display), atomWindowsRequested, 0L, (~0L), false, AnyPropertyType, &actualType,
                                         &format, &numItems, &bytesAfter, &data);
-        if (status == Success && data && numItems) {
+        // Window lists are WINDOW/32, i.e. XIDs (longs) on the client side. Any client can set these root properties:
+        // read as XIDs, format 8 or 16 data ran past the buffer.
+        if (status == Success && data && numItems && format == 32) {
             auto array = (XID *)data;
             for (decltype(numItems) k = 0; k < numItems; k++) {
                 auto window = array[k];
@@ -589,7 +591,12 @@ namespace Screen_Capture {
         if (Success == XGetWindowProperty(display, window, atomPID, 0, 1, False, XA_CARDINAL, &type, &format, &nItems, &bytesAfter, &propPID)) {
             if (propPID != 0) {
                 FreeWrapRAII tmp(propPID);
-                return *reinterpret_cast<pid_t *>(propPID);
+                // Only a CARDINAL/32 value is a pid. On a type mismatch Xlib still hands out a 1-byte buffer (nItems 0),
+                // and format 8/16 data is shorter than a pid: reading 4 bytes there ran past the buffer. Format-32 items
+                // are longs on the client side.
+                if (type == XA_CARDINAL && format == 32 && nItems >= 1) {
+                    return static_cast<pid_t>(*reinterpret_cast<unsigned long *>(propPID));
+                }
             }
         }
         return 0;
@@ -707,7 +714,8 @@ namespace Screen_Capture {
             return false;
         }
 
-        if (type != XA_CARDINAL) {
+        // CARDINAL/32 only: the items are read as longs below (format 8 or 16 data is shorter).
+        if (type != XA_CARDINAL || format != 32) {
             XFree(data);
             return false;
         }
@@ -864,7 +872,8 @@ namespace Screen_Capture {
         if (result != Success)
             return false;
 
-        if (type != XA_CARDINAL) {
+        // CARDINAL/32 only: the items are copied as longs below (format 8 or 16 data is shorter: the copy overran it).
+        if (type != XA_CARDINAL || format != 32) {
             XFree(nums);
             return false;
         }
@@ -900,7 +909,8 @@ namespace Screen_Capture {
             return false;
         }
 
-        if (type != XA_ATOM) {
+        // ATOM/32 only: the items are copied as Atoms (longs) below (format 8 or 16 data is shorter: the copy overran it).
+        if (type != XA_ATOM || format != 32) {
             XFree(data);
             return false;
         }
