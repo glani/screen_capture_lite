@@ -602,6 +602,13 @@ namespace Screen_Capture {
         return readlink(path, buf, sz);
     }
 
+    // _NET_WM_ICON is written by the window's client, so its sizes are not trusted: an icon side above this is skipped
+    // (no real icon is that large; it keeps 4 * w * h, the RGBA buffer size, far inside int).
+    static const unsigned long kMaxIconSide = 4096;
+
+    // libwnck's find_best_size. Returns false when there is no usable icon (the old code returned true with 0x0 then,
+    // which went on to the PNG encoder). w * h is computed in 64 bits: as int, 65536 x 65536 overflowed to 0 and a
+    // 0xFFFFFFFF side became -1, so a client's icon could make the reader walk out of the property buffer.
     bool findBestSize(unsigned long *data, unsigned long nitems, int ideal_size, int *width, int *height, unsigned long **start)
     {
         int best_w;
@@ -617,7 +624,6 @@ namespace Screen_Capture {
         best_start = NULL;
 
         while (nitems > 0) {
-            int w, h;
             bool replace;
 
             replace = false;
@@ -625,11 +631,22 @@ namespace Screen_Capture {
             if (nitems < 3)
                 return false; /* no space for w, h */
 
-            w = data[0];
-            h = data[1];
+            // format-32 items are CARD32 values in longs
+            const unsigned long long w64 = data[0] & 0xFFFFFFFFUL;
+            const unsigned long long h64 = data[1] & 0xFFFFFFFFUL;
+            const unsigned long long pixels = w64 * h64; // < 2^64: both factors < 2^32
 
-            if (nitems < ((unsigned long)(w * h) + 2))
+            if (pixels > nitems - 2)
                 break; /* not enough data */
+
+            if (w64 == 0 || h64 == 0 || w64 > kMaxIconSide || h64 > kMaxIconSide) {
+                // not an icon we can encode; its pixels are there, so step over it
+                data += pixels + 2;
+                nitems -= pixels + 2;
+                continue;
+            }
+            const int w = static_cast<int>(w64);
+            const int h = static_cast<int>(h64);
 
             if (best_start == NULL) {
                 replace = true;
@@ -658,8 +675,8 @@ namespace Screen_Capture {
                 best_h = h;
             }
 
-            data += (w * h) + 2;
-            nitems -= (w * h) + 2;
+            data += pixels + 2;
+            nitems -= pixels + 2;
         }
 
         if (best_start) {
@@ -669,7 +686,7 @@ namespace Screen_Capture {
             return true;
         }
         else
-            return true;
+            return false;
     }
 
     bool readRgbIcon(Display *display, XID &window, int *width, int *height, std::string &icon)
@@ -707,11 +724,14 @@ namespace Screen_Capture {
         argbdataToPixdata(best, w * h, &pixdata);
         XFree(data);
 
-        unsigned char *pngData;
-        size_t outsize;
+        unsigned char *pngData = nullptr;
+        size_t outsize = 0;
         unsigned int pngEncResult = lodepng_encode_memory(&pngData, &outsize, pixdata, w, h, LCT_RGBA, 8);
         delete[] pixdata;
         if (0 != pngEncResult) {
+            // lodepng_encode sets *out to NULL first and, on an error after the PNG signature was written, still hands
+            // out the partial buffer (lodepng.cpp: "*out = outv.data" at the end of lodepng_encode): free it either way.
+            free(pngData);
             return false;
         }
         icon = base64_encode(pngData, outsize, std::string("data:image/png;base64,"), false);
