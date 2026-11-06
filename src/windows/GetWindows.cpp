@@ -429,6 +429,14 @@ namespace SL {
                 return TRUE;
             }
 
+            // Cloaked windows are not on screen although they are WS_VISIBLE: windows on another virtual desktop,
+            // UWP frames of suspended or closed apps (Settings, Calculator, ...). Left out of the list, like
+            // Alt+Tab does. Only here: GetWindow / GetActiveWindow on a known handle still answer for them.
+            DWORD cloaked = 0;
+            if (SUCCEEDED(DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, &cloaked, sizeof(cloaked))) && cloaked != 0) {
+                return TRUE;
+            }
+
             auto *s = reinterpret_cast<SearchWindows *>(lParam);
             auto w = getWindow(hwnd, s->RetrieveIcons, s->Monitors);
             if (w) {
