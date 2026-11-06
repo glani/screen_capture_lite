@@ -426,8 +426,12 @@ namespace Screen_Capture {
             getFrameExtents(display, window, &leftFrame, &rightFrame, &topFrame, &bottomFrame);
             w.Frame = FrameValues(leftFrame, rightFrame, topFrame, bottomFrame);
 
-            w.Position = Point(xp, yp);
-            w.Size = SizeValues(wndattr.width, wndattr.height);
+            // Position/Size: the VISIBLE frame, as on Windows and macOS. (xp, yp, width, height) is the client
+            // window; the frames are the window manager's decoration around it (_NET_FRAME_EXTENTS, positive) or the
+            // client-side shadow inside it (_GTK_FRAME_EXTENTS, reported negative), so visible = client grown by the
+            // frames. Frame stays "what to add to a visible rect to get the client rect", the rect Rectangle() takes.
+            w.Position = Point(xp - leftFrame, yp - topFrame);
+            w.Size = SizeValues(wndattr.width + leftFrame + rightFrame, wndattr.height + topFrame + bottomFrame);
             w.Name = name;
 
             // WM_CLASS is optional (Wine, some Java/Tk and hand-written X clients have none). On failure XGetClassHint

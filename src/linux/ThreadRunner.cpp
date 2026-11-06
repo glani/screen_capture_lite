@@ -12,6 +12,12 @@ namespace SL{
             TryCaptureMonitor<X11FrameProcessor>(data, monitor);
         }
         void RunCaptureWindow(std::shared_ptr<Thread_Data> data, Window window){
+            // Window.Position/Size is the visible frame (GetWindows.cpp addWindow), but X11FrameProcessor grabs the
+            // client window: capture with the client geometry (visible frame + Frame), as before.
+            window.Position.X += window.Frame.LeftFrame;
+            window.Position.Y += window.Frame.TopFrame;
+            window.Size.Width -= window.Frame.LeftFrame + window.Frame.RightFrame;
+            window.Size.Height -= window.Frame.TopFrame + window.Frame.BottomFrame;
             TryCaptureWindow<X11FrameProcessor>(data, window);
         }
     }
