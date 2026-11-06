@@ -518,8 +518,10 @@ namespace SL {
             wchar_t filenameBuffer[4000];
             DWORD processId;
             GetWindowThreadProcessId(hwnd, &processId);
+            // PROCESS_QUERY_LIMITED_INFORMATION is all GetProcessImageFileName / QueryFullProcessImageName need, and
+            // unlike QUERY_INFORMATION | VM_READ it is granted for elevated and protected processes too.
             auto hProcess = OpenProcess(
-                    PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, // PROCESS_QUERY_LIMITED_INFORMATION,
+                    PROCESS_QUERY_LIMITED_INFORMATION,
                     FALSE,
                     processId);
             if (hProcess != NULL) {
@@ -536,8 +538,8 @@ namespace SL {
                 }
                 TCHAR processFileName[MAX_PATH];
                 DWORD charsCarried = MAX_PATH;
-                QueryFullProcessImageName(hProcess, 0, processFileName, &charsCarried);
-                if (charsCarried) {
+                // on failure charsCarried stays MAX_PATH: do not read the uninitialised buffer then
+                if (QueryFullProcessImageName(hProcess, 0, processFileName, &charsCarried) && charsCarried) {
                     w.ProcessName = StringHelper::ws2s(std::wstring(processFileName, charsCarried));
                     WindowAttribute attributeName;
                     attributeName.Code = std::string(S_RES_START_ABSOLUTE_URL);
@@ -775,11 +777,11 @@ namespace SL {
         }
 
         std::shared_ptr<std::pair<HICON, HICON>> retrieveIcon(HANDLE hProcess) {
-            // Get the path of the executable file
+            // Get the path of the executable file (QueryFullProcessImageName: GetModuleFileNameEx needs
+            // PROCESS_VM_READ, which the handle no longer has)
             wchar_t path[MAX_PATH];
-            DWORD pathSize = GetModuleFileNameEx(hProcess, NULL, &path[0], MAX_PATH);
-
-            if (pathSize == 0) {
+            DWORD pathSize = MAX_PATH;
+            if (!QueryFullProcessImageNameW(hProcess, 0, &path[0], &pathSize) || pathSize == 0) {
                 return nullptr;
             }
 
