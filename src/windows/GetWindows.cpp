@@ -309,7 +309,9 @@ namespace SL {
             if (IsWindow(hwnd)) {
                 if (!force) {
                     // SetForegroundWindow(hwnd);
-                    SendMessage(hwnd, WM_CLOSE, 0, 0);
+                    // Posted, not sent: WM_CLOSE runs the app's close logic (a "Save changes?" dialog waits for the
+                    // user), and SendMessage waited for all of it, or for ever on a hung window, on this thread.
+                    PostMessage(hwnd, WM_CLOSE, 0, 0);
                 } else {
                     DWORD dwProcessId;
                     GetWindowThreadProcessId(hwnd, &dwProcessId);
