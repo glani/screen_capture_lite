@@ -349,13 +349,121 @@ namespace SL {
             return nullptr;
         }
 
+        // MaximizeHorz / MaximizeVert. Windows has no per-axis maximized state (Linux asks the window manager for
+        // EWMH's _NET_WM_STATE_MAXIMIZED_HORZ / _VERT; macOS does not support it). Emulated with the same meaning: the
+        // window's visible frame (DWM's extended frame bounds; the invisible resize borders stay outside) spans the work
+        // area of its monitor on that axis, the other axis is left alone. The extent it had before is kept per HWND in
+        // this process (like savedFrames), so maximize=false puts it back, as the window manager does on Linux. If the
+        // window was moved or resized on that axis since, maximize=false leaves it there. A maximized window (both
+        // axes) that loses one axis keeps the other, as with EWMH. getWindow does not report the emulated state.
+        struct SavedExtent {
+            LONG Start, Length;               // the outer rect on that axis before maximize=true
+            LONG AppliedStart, AppliedLength; // and right after it (the window may have adjusted the requested rect)
+        };
+        static std::mutex savedExtentsMutex;
+        static std::map<HWND, SavedExtent> savedHorz;
+        static std::map<HWND, SavedExtent> savedVert;
+
+        static LONG axisStart(const RECT &r, bool horz) { return horz ? r.left : r.top; }
+        static LONG axisEnd(const RECT &r, bool horz) { return horz ? r.right : r.bottom; }
+
+        static bool maximizeAxis(HWND hwnd, bool horz, bool maximize) {
+            auto &saved = horz ? savedHorz : savedVert;
+            if (IsIconic(hwnd)) {
+                ShowWindow(hwnd, SW_RESTORE);
+            }
+            if (IsZoomed(hwnd)) {
+                if (maximize) {
+                    return true; // spans both axes already
+                }
+                // loses this axis only: back to the normal rectangle, then the other axis spans the work area
+                ShowWindow(hwnd, SW_RESTORE);
+                {
+                    std::lock_guard<std::mutex> lock(savedExtentsMutex);
+                    savedHorz.erase(hwnd);
+                    savedVert.erase(hwnd);
+                }
+                return maximizeAxis(hwnd, !horz, true);
+            }
+            RECT outer = {};
+            if (!::GetWindowRect(hwnd, &outer)) {
+                return false;
+            }
+            RECT visible = outer; // without DWM composition there are no invisible borders
+            if (FAILED(DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &visible, sizeof(visible)))) {
+                visible = outer;
+            }
+            const LONG start = axisStart(outer, horz);
+            const LONG length = axisEnd(outer, horz) - start;
+            LONG newStart, newLength;
+            if (maximize) {
+                MONITORINFO mi = {};
+                mi.cbSize = sizeof(mi);
+                HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+                if (!monitor || !GetMonitorInfoW(monitor, &mi)) {
+                    return false;
+                }
+                std::lock_guard<std::mutex> lock(savedExtentsMutex);
+                auto found = saved.find(hwnd);
+                if (found != saved.end() && found->second.AppliedStart == start && found->second.AppliedLength == length) {
+                    return true; // still where maximize=true put it: keep the extent from before
+                }
+                saved[hwnd] = SavedExtent{start, length, 0, 0};
+                newStart = axisStart(mi.rcWork, horz) - (axisStart(visible, horz) - start);
+                newLength = axisEnd(mi.rcWork, horz) + (axisEnd(outer, horz) - axisEnd(visible, horz)) - newStart;
+            } else {
+                std::lock_guard<std::mutex> lock(savedExtentsMutex);
+                auto found = saved.find(hwnd);
+                if (found == saved.end()) {
+                    return true; // not maximized on this axis here: nothing to put back
+                }
+                const SavedExtent s = found->second;
+                saved.erase(found);
+                if (s.AppliedStart != start || s.AppliedLength != length) {
+                    return true; // moved or resized since: leave it
+                }
+                newStart = s.Start;
+                newLength = s.Length;
+            }
+            // SetWindowPos outside the lock: it waits for the window's thread (WM_WINDOWPOSCHANGING)
+            const BOOL moved = horz ? SetWindowPos(hwnd, nullptr, newStart, outer.top, newLength, outer.bottom - outer.top,
+                                                   SWP_NOZORDER | SWP_NOACTIVATE)
+                                    : SetWindowPos(hwnd, nullptr, outer.left, newStart, outer.right - outer.left, newLength,
+                                                   SWP_NOZORDER | SWP_NOACTIVATE);
+            if (maximize) {
+                RECT after = {};
+                const bool haveAfter = moved && ::GetWindowRect(hwnd, &after);
+                std::lock_guard<std::mutex> lock(savedExtentsMutex);
+                auto found = saved.find(hwnd);
+                if (found != saved.end()) {
+                    if (haveAfter) {
+                        found->second.AppliedStart = axisStart(after, horz);
+                        found->second.AppliedLength = axisEnd(after, horz) - axisStart(after, horz);
+                    } else {
+                        saved.erase(found);
+                    }
+                }
+            }
+            return moved != FALSE;
+        }
+
         std::shared_ptr<Window> MaximizeHorz(const SingleWindowRequest &windowRequest, bool maximize) {
-            // not supported
+            HWND hwnd = reinterpret_cast<HWND>(windowRequest.Handle);
+            if (IsWindow(hwnd)) {
+                maximizeAxis(hwnd, true, maximize);
+                auto monitors = GetMonitors();
+                return getWindow(hwnd, windowRequest.RetrieveIcons, monitors.get());
+            }
             return nullptr;
         }
 
         std::shared_ptr<Window> MaximizeVert(const SingleWindowRequest &windowRequest, bool maximize) {
-            // not supported
+            HWND hwnd = reinterpret_cast<HWND>(windowRequest.Handle);
+            if (IsWindow(hwnd)) {
+                maximizeAxis(hwnd, false, maximize);
+                auto monitors = GetMonitors();
+                return getWindow(hwnd, windowRequest.RetrieveIcons, monitors.get());
+            }
             return nullptr;
         }
 
