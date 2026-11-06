@@ -1,29 +1,11 @@
 #include "internal/SCCommon.h"
 #include "ScreenCapture.h"
 #include <DXGI.h>
+#include <ShellScalingApi.h>
+#pragma comment(lib, "Shcore.lib")  // GetDpiForMonitor (Windows 8.1+)
 
 namespace SL {
 namespace Screen_Capture {
-
-    float scaleFromDpi(int xdpi)
-    {
-        switch (xdpi) {
-        case 96:
-            return 1.0f;
-            break;
-        case 120:
-            return 1.25f;
-            break;
-        case 144:
-            return 1.5f;
-            break;
-        case 192:
-            return 2.0f;
-            break;
-        }
-
-        return 1.0f;
-    }
 
     RECT frameToRect(const Rect& frame) {
         RECT rect;
@@ -74,10 +56,13 @@ namespace Screen_Capture {
                     std::wstring wname = desc.DeviceName;
                     std::string name(wname.begin(), wname.end());
 
-                    auto mon = CreateDCW(desc.DeviceName, NULL, NULL, NULL);
-                    auto xdpi = GetDeviceCaps(mon, LOGPIXELSX);
-                    DeleteDC(mon);
-                    auto scale = scaleFromDpi(xdpi);
+                    // The monitor's own effective DPI. GetDeviceCaps(LOGPIXELSX) is the SYSTEM DPI in a per-monitor
+                    // aware process (Electron is), and scaleFromDpi knew only 96/120/144/192 (else 1.0): 175 % or
+                    // a second monitor at another scale came out wrong.
+                    UINT dpiX = 96, dpiY = 96;
+                    auto scale = SUCCEEDED(GetDpiForMonitor(desc.Monitor, MDT_EFFECTIVE_DPI, &dpiX, &dpiY))
+                                     ? static_cast<float>(dpiX) / 96.0f
+                                     : 1.0f;
 
                     bool flipSides = desc.Rotation == DXGI_MODE_ROTATION_ROTATE90 || desc.Rotation == DXGI_MODE_ROTATION_ROTATE270;
                     Monitor monitor = CreateMonitor(static_cast<int>(ret->size()), j, i,
