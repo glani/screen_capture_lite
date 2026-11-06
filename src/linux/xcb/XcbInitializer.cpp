@@ -345,9 +345,10 @@ void XcbInitializer::minimize(const xcb_window_t &win, bool minimize) {
     if (minimize) {
         XIconifyWindow(xlibDisplay(), win, primaryScreenNumberValue);
     } else {
-        visible(win, false);
-        visible(win, true);
-        XMapWindow(xlibDisplay(), win);
+        // EWMH: activating a window un-minimizes it. The old unmap + map withdrew the window: the window manager
+        // unmanaged it and managed it again as a new window (map animation, pulled to the current workspace, and an
+        // activation sent meanwhile was lost because the new frame was not shown yet).
+        activate(win);
     }
 }
 
