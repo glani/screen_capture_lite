@@ -13,6 +13,8 @@ namespace SL {
             XID RootWindow;
             int Last_x = 0;
             int Last_y =0;
+            int LastWidth = -1; // size of the image sent last (-1: none from the current buffers)
+            int LastHeight = -1;
             
         public:
             const int MaxCursurorSize =32;

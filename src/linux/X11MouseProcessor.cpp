@@ -54,12 +54,17 @@ namespace SL {
             imgrect.left = imgrect.top = 0;
             imgrect.right = img->width;
             imgrect.bottom = img->height;
-            auto newsize = sizeof(ImageBGRA)*imgrect.right*imgrect.bottom;
-            if(newsize>ImageBufferSize || !OldImageBuffer){
-                ImageBuffer = std::make_unique<unsigned char[]>(sizeof(ImageBGRA)*imgrect.right*imgrect.bottom);
-                OldImageBuffer=std::make_unique<unsigned char[]>(sizeof(ImageBGRA)*imgrect.right*imgrect.bottom);
+            const int newsize = static_cast<int>(sizeof(ImageBGRA)) * imgrect.right * imgrect.bottom;
+            // Both buffers hold ImageBufferSize bytes, so it has to follow a reallocation. It did not: once the first
+            // frame had sized them for a 16x16 cursor (1024 bytes), a 24x24 one (2304 bytes, within the initial 32x32
+            // capacity) was copied into them (heap overflow), and a cursor above 32x32 reallocated both on every frame.
+            if (newsize > ImageBufferSize || !OldImageBuffer) {
+                ImageBuffer = std::make_unique<unsigned char[]>(newsize);
+                OldImageBuffer = std::make_unique<unsigned char[]>(newsize);
+                ImageBufferSize = newsize;
+                LastWidth = LastHeight = -1; // nothing sent from these buffers yet
             }
-            
+
             memcpy(ImageBuffer.get(), img->pixels, newsize);
 
                 // Get the mouse cursor position
@@ -78,12 +83,19 @@ namespace SL {
 
             if (Data->ScreenCaptureData.OnMouseChanged) {
 
-                auto wholeimg = CreateImage(imgrect, 0, reinterpret_cast<const ImageBGRA*>(OldImageBuffer.get()));
-                    
-                //if the mouse image is different, send the new image and swap the data 
-                if (memcmp(ImageBuffer.get(), OldImageBuffer.get(), newsize) != 0) {
+                // the image just read, as on Windows (it was OldImageBuffer: the cursor sent last time, all zeros on
+                // the first frame and after a reallocation). Rows are packed: CreateImage's second argument is the
+                // distance to the next row (GotoNextRow), so 0 made Extract() copy the first row into every row.
+                auto wholeimg = CreateImage(imgrect, imgrect.right * static_cast<int>(sizeof(ImageBGRA)),
+                                            reinterpret_cast<const ImageBGRA*>(ImageBuffer.get()));
+                wholeimg.isContiguous = true;
+
+                //if the mouse image is different (or its size), send the new image and swap the data
+                if (imgrect.right != LastWidth || imgrect.bottom != LastHeight || memcmp(ImageBuffer.get(), OldImageBuffer.get(), newsize) != 0) {
                     Data->ScreenCaptureData.OnMouseChanged(&wholeimg, mousepoint);
                     std::swap(ImageBuffer, OldImageBuffer);
+                    LastWidth = imgrect.right;
+                    LastHeight = imgrect.bottom;
                 }
                 else if(Last_x != x || Last_y != y){
                     Data->ScreenCaptureData.OnMouseChanged(nullptr, mousepoint);
