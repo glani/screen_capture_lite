@@ -3,9 +3,12 @@
 #include <memory>
 #include <xcb/xcb.h>
 
+#include <cerrno>
 #include <chrono>
+#include <cstring>
 #include <poll.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <xcb/xcb_icccm.h>
 
 static const char *const xcbConnectionErrors[] = {
@@ -28,19 +31,42 @@ static int nullErrorHandler(Display *dpy, XErrorEvent *err) {
     return 0;
 }
 
+// The process exit code after a lost X connection: EX_IOERR (sysexits.h). Distinct from Xlib's default exit(1) and from
+// signal deaths (128 + n), so whoever runs the process (SMBAct's engine supervisor, the renderer reanimator) can name
+// the cause. tests/linux/ci_leak_check.sh checks it.
+static const int kExitXConnectionLost = 74;
+
+// Xlib calls this when a connection breaks (the X server went away, or the connection hit a fatal protocol error). It is
+// process-wide, and Xlib does not let the process go on: when it returns, Xlib's exit handler calls exit(1) (checked
+// with libX11 1.8.7). Before, that happened almost silently ("The X11 connection broke: I/O error (code 1)" without a
+// newline, Xlib's own line, exit code 1), like any other crash.
+//
+// Now: one clear line on stderr, then _exit(kExitXConnectionLost). Not exit(): this runs on whatever thread made the
+// failing call (a libuv worker in Node/Electron), and exit() would run atexit handlers and static destructors while the
+// other threads keep running, which can crash and hide the cause again.
+//
+// Not recovered in-process, on purpose. libX11 >= 1.7 has XSetIOErrorExitHandler, and with an exit handler that returns,
+// the broken display fails every later call cleanly (also checked with 1.8.7). But (1) it is missing from libX11 < 1.7
+// (Ubuntu 20.04 ships 1.6.9: the module would not load there); (2) the rest of the call in flight would run on failed
+// Xlib calls, and several results are used without checking (XTranslateCoordinates, XQueryPointer, ...); (3) the usual
+// cause is the X server going away, which ends the X session or Xwayland, and with it the app's own browser process,
+// which is an X client of the same server. A connection that is gone between two calls is not an error here: every call
+// opens its own connections, and without a server the next one returns an empty result (isValid()).
 static int ioErrorHandler(Display *dpy) {
-    xcb_connection_t *conn = XGetXCBConnection(dpy);
+    const int savedErrno = errno;
+    const char *str = "unknown error";
+    int code = -1;
+    xcb_connection_t *conn = dpy ? XGetXCBConnection(dpy) : nullptr;
     if (conn != nullptr) {
-        /* Print a message with a textual description of the error */
-        int code = xcb_connection_has_error(conn);
-        const char *str = "Unknown error";
-        int arrayLength = sizeof(xcbConnectionErrors) / sizeof(xcbConnectionErrors[0]);
+        code = xcb_connection_has_error(conn);
+        const int arrayLength = sizeof(xcbConnectionErrors) / sizeof(xcbConnectionErrors[0]);
         if (code >= 0 && code < arrayLength)
             str = xcbConnectionErrors[code];
-
-        fprintf(stderr, "The X11 connection broke: %s (code %d)", str, code);
     }
-    return _XDefaultIOError(dpy);
+    const char *name = dpy ? DisplayString(dpy) : nullptr;
+    fprintf(stderr, "smpostio-utils: lost the connection to the X server \"%s\" (%s, xcb code %d, errno %d: %s); exiting with code %d\n",
+            name ? name : "", str, code, savedErrno, strerror(savedErrno), kExitXConnectionLost);
+    _exit(kExitXConnectionLost);
 }
 
 typedef enum {
