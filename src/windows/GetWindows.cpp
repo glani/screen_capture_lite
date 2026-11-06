@@ -557,11 +557,16 @@ namespace SL {
                 w.Attributes.emplace_back(attributeName);
 
 
-                HICON hIcon = (HICON) SendMessage(hwnd, WM_GETICON, ICON_BIG, 0);
+                // WM_GETICON is answered by the window's own thread: bounded wait, or one hung window blocks this
+                // call (and the worker thread) for ever. The handle is borrowed (the window owns it), so it is not
+                // destroyed here; DestroyIcon on it destroyed the icon of SMBAct's own windows.
+                DWORD_PTR iconResult = 0;
+                HICON hIcon = NULL;
+                if (SendMessageTimeout(hwnd, WM_GETICON, ICON_BIG, 0, SMTO_ABORTIFHUNG, 100, &iconResult)) {
+                    hIcon = reinterpret_cast<HICON>(iconResult);
+                }
                 if (hIcon != NULL) {
-                    auto image = retrieveBase64IconData(hIcon);
                     fillIconsIfNeeded(w, hIcon, retrieveIcons);
-                    DestroyIcon(hIcon);
                 } else {
                     auto icons = retrieveIcon(hProcess);
                     if (icons) {
