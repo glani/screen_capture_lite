@@ -39,7 +39,11 @@ namespace SL {
             auto Ret = DUPL_RETURN_SUCCESS;
     
             auto img = XFixesGetCursorImage(SelectedDisplay);
-       
+            if (!img) {
+                // no XFixes on this server, or the request failed (was dereferenced as is); as on Windows (GetCursorInfo)
+                return DUPL_RETURN_ERROR_EXPECTED;
+            }
+
             if (sizeof(img->pixels[0]) == 8) {//if the pixelstride is 64 bits.. scale down to 32bits
                 auto pixels = (int *)img->pixels;
                 for (auto i = 0; i < img->width * img->height; ++i) {
@@ -63,12 +67,14 @@ namespace SL {
             unsigned int mask = 0;
             XID child_win, root_win;
             XQueryPointer(SelectedDisplay, RootWindow, &child_win, &root_win, &root_x, &root_y, &x, &y, &mask);
-                
+
+            // the hotspot is read before XFree(img): it was read from the freed image (use after free)
+            const Point hotSpot{static_cast<int>(img->xhot), static_cast<int>(img->yhot)};
             XFree(img);
-             
+
             MousePoint mousepoint = {};
             mousepoint.Position = Point{x, y};
-            mousepoint.HotSpot = Point{static_cast<int>(img->xhot), static_cast<int>(img->yhot)};
+            mousepoint.HotSpot = hotSpot;
 
             if (Data->ScreenCaptureData.OnMouseChanged) {
 
