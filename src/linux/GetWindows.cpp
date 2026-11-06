@@ -355,7 +355,7 @@ namespace Screen_Capture {
         unsigned char *data = 0;
         int status = XGetWindowProperty(display, XDefaultRootWindow(display), atomWindowsRequested, 0L, (~0L), false, AnyPropertyType, &actualType,
                                         &format, &numItems, &bytesAfter, &data);
-        if (status >= Success && numItems) {
+        if (status == Success && data && numItems) {
             auto array = (XID *)data;
             for (decltype(numItems) k = 0; k < numItems; k++) {
                 auto window = array[k];
@@ -368,6 +368,9 @@ namespace Screen_Capture {
                     addWindow(xcbInstance, window, wr, [&](const Window &wnd) { result->emplace_back(wnd); });
                 }
             }
+        }
+        if (data) {
+            // XGetWindowProperty hands out a (1-byte) buffer even for an existing but empty property.
             XFree(data);
         }
         return result;
