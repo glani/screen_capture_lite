@@ -63,6 +63,9 @@ public:
 
     bool windowExists(const xcb_window_t& win) const;
 
+    // The window manager lists `feature` (an atom) in the root's _NET_SUPPORTED.
+    bool wmSupports(xcb_atom_t feature);
+
     void rectangle(const xcb_window_t& win, const SL::Screen_Capture::Point &point, const SL::Screen_Capture::SizeValues &values);
 
     void flush();

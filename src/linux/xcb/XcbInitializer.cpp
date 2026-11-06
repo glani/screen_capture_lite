@@ -119,31 +119,56 @@ std::string XcbInitializer::atomName(xcb_atom_t atom) {
 
 void XcbInitializer::flush() { xcb_flush(xcbConnectionValue); }
 
+bool XcbInitializer::wmSupports(xcb_atom_t feature) {
+    // The root's _NET_SUPPORTED lists the hints and messages the running window manager implements.
+    auto supported = XCB_REPLY_UNCHECKED(xcb_get_property, xcbConnectionValue, false, rootWindowValue,
+                                         atom(XcbAtom::Atom::_NET_SUPPORTED), XCB_ATOM_ATOM, 0, 4096);
+    if (!supported || supported->type != XCB_ATOM_ATOM || supported->format != 32) {
+        return false;
+    }
+    auto atoms = static_cast<const xcb_atom_t *>(xcb_get_property_value(supported.get()));
+    int n = xcb_get_property_value_length(supported.get()) / static_cast<int>(sizeof(xcb_atom_t));
+    for (int i = 0; i < n; i++) {
+        if (atoms[i] == feature) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void XcbInitializer::rectangle(const xcb_window_t &win, const SL::Screen_Capture::Point &position,
                                const SL::Screen_Capture::SizeValues &size) {
-    xcb_client_message_event_t event;
+    // (x, y, width, height) is the CLIENT rectangle (frames come on top), so the request must be read with
+    // StaticGravity. Only the _NET_MOVERESIZE_WINDOW message goes to an EWMH window manager: a raw ConfigureWindow
+    // sent as well is read with the window's own WM_NORMAL_HINTS gravity (usually NorthWest, i.e. (x, y) is the
+    // frame's corner), and as the later request it wins on Mutter and KWin (the window lands one title bar low).
+    // Source 2 (pager/tool): SMBAct moves the window on the user's behalf (EWMH source indication).
+    const xcb_atom_t moveResize = atom(XcbAtom::Atom::_NET_MOVERESIZE_WINDOW);
+    if (moveResize != XCB_ATOM_NONE && wmSupports(moveResize)) {
+        xcb_client_message_event_t event{};
 
-    int gravityAndFlags = WINDOW_GRAVITY_STATIC;
+        uint32_t gravityAndFlags = WINDOW_GRAVITY_STATIC;
+        const uint32_t flags = WINDOW_CHANGE_X | WINDOW_CHANGE_Y | WINDOW_CHANGE_WIDTH | WINDOW_CHANGE_HEIGHT;
+        gravityAndFlags |= flags << 8;
+        gravityAndFlags |= 2u << 12; // source indication: pager
 
-    auto flags = WINDOW_CHANGE_X | WINDOW_CHANGE_Y | WINDOW_CHANGE_WIDTH | WINDOW_CHANGE_HEIGHT;
+        event.response_type = XCB_CLIENT_MESSAGE;
+        event.window = win;
+        event.type = moveResize;
+        event.format = 32;
+        event.data.data32[0] = gravityAndFlags;
+        event.data.data32[1] = static_cast<uint32_t>(position.X);
+        event.data.data32[2] = static_cast<uint32_t>(position.Y);
+        event.data.data32[3] = static_cast<uint32_t>(size.Width);
+        event.data.data32[4] = static_cast<uint32_t>(size.Height);
 
-    gravityAndFlags |= flags << 8;
-    gravityAndFlags |= 1 << 12;
+        xcb_send_event(xcbConnectionValue, false, rootWindowValue,
+                       XCB_EVENT_MASK_STRUCTURE_NOTIFY | XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT,
+                       (char *) &event);
+        return;
+    }
 
-    event.response_type = XCB_CLIENT_MESSAGE;
-    event.window = win;
-    event.type = atom(XcbAtom::Atom::_NET_MOVERESIZE_WINDOW);
-    event.format = 32;
-    event.data.data32[0] = gravityAndFlags;
-    event.data.data32[1] = static_cast<uint32_t>(position.X);
-    event.data.data32[2] = static_cast<uint32_t>(position.Y);
-    event.data.data32[3] = static_cast<uint32_t>(size.Width);
-    event.data.data32[4] = static_cast<uint32_t>(size.Height);
-
-    xcb_send_event(xcbConnectionValue, false, rootWindowValue,
-                   XCB_EVENT_MASK_STRUCTURE_NOTIFY | XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT,
-                   (char *) &event);
-
+    // No EWMH window manager (or one without _NET_MOVERESIZE_WINDOW): configure the window directly.
     uint32_t values[] = {static_cast<uint32_t>(position.X), static_cast<uint32_t>(position.Y), static_cast<uint32_t>(size.Width),
                          static_cast<uint32_t>(size.Height)};
     xcb_configure_window(xcbConnectionValue, win, XCB_CONFIG_WINDOW_X_Y_WIDTH_HEIGHT, values);
