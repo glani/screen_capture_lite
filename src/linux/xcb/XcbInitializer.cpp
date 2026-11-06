@@ -3,6 +3,8 @@
 #include <memory>
 #include <xcb/xcb.h>
 
+#include <chrono>
+#include <poll.h>
 #include <stdio.h>
 #include <xcb/xcb_icccm.h>
 
@@ -200,26 +202,75 @@ void XcbInitializer::visible(const xcb_window_t &win, bool visible) {
     xcb_change_window_attributes(xcbConnectionValue, rootWindow(), XCB_CW_EVENT_MASK, values_on);
 }
 
+xcb_timestamp_t XcbInitializer::serverTime() {
+    // The X server's current time: a zero-length append to a property of a throwaway input-only window of ours
+    // makes the server send a PropertyNotify carrying its time (the usual way, e.g. GDK's gdk_x11_get_server_time).
+    // Bounded wait: XCB_CURRENT_TIME when nothing arrives (a broken connection).
+    xcb_window_t probe = xcb_generate_id(xcbConnectionValue);
+    const uint32_t values[] = {1 /* override_redirect: never managed */, XCB_EVENT_MASK_PROPERTY_CHANGE};
+    xcb_create_window(xcbConnectionValue, 0, probe, rootWindowValue, -1, -1, 1, 1, 0, XCB_WINDOW_CLASS_INPUT_ONLY,
+                      XCB_COPY_FROM_PARENT, XCB_CW_OVERRIDE_REDIRECT | XCB_CW_EVENT_MASK, values);
+    xcb_change_property(xcbConnectionValue, XCB_PROP_MODE_APPEND, probe, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, 0, nullptr);
+    xcb_flush(xcbConnectionValue);
+
+    xcb_timestamp_t time = XCB_CURRENT_TIME;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(500);
+    bool found = false;
+    while (!found && !xcb_connection_has_error(xcbConnectionValue)) {
+        while (xcb_generic_event_t *ev = xcb_poll_for_event(xcbConnectionValue)) {
+            if ((ev->response_type & ~0x80) == XCB_PROPERTY_NOTIFY &&
+                reinterpret_cast<xcb_property_notify_event_t *>(ev)->window == probe) {
+                time = reinterpret_cast<xcb_property_notify_event_t *>(ev)->time;
+                found = true;
+            }
+            free(ev);
+            if (found) {
+                break;
+            }
+        }
+        if (found) {
+            break;
+        }
+        const auto left = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now()).count();
+        if (left <= 0) {
+            break;
+        }
+        pollfd pfd = {xcb_get_file_descriptor(xcbConnectionValue), POLLIN, 0};
+        poll(&pfd, 1, static_cast<int>(left));
+    }
+    xcb_destroy_window(xcbConnectionValue, probe);
+    return time;
+}
+
 void XcbInitializer::activate(const xcb_window_t &win) {
+    const xcb_atom_t activeWindow = atom(XcbAtom::Atom::_NET_ACTIVE_WINDOW);
+    if (activeWindow != XCB_ATOM_NONE && wmSupports(activeWindow)) {
+        // EWMH activation: the window manager un-minimizes, raises and focuses the window, and switches to its
+        // workspace. Source 2 (pager): SMBAct activates on the user's request, so focus-stealing prevention does not
+        // apply. A real server timestamp: 0 is "buggy client" for Mutter (it substitutes the current time), and KWin
+        // falls back to the target window's own, older user time, which can turn the activation into "demands
+        // attention". No ConfigureWindow raise next to it: the window manager raises the window itself.
+        xcb_client_message_event_t event{};
+        event.response_type = XCB_CLIENT_MESSAGE;
+        event.window = win;
+        event.type = activeWindow;
+        event.format = 32;
+        event.data.data32[0] = 2;
+        event.data.data32[1] = serverTime();
+        event.data.data32[2] = XCB_NONE;
+        event.data.data32[3] = 0;
+        event.data.data32[4] = 0;
+
+        xcb_send_event(xcbConnectionValue, false, rootWindowValue,
+                       XCB_EVENT_MASK_STRUCTURE_NOTIFY | XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT,
+                       (char *) &event);
+        return;
+    }
+
+    // No EWMH window manager: map it (ICCCM: mapping an iconic window makes it normal) and move it on top.
     const static uint32_t values[] = {XCB_STACK_MODE_ABOVE};
-
-    /* Move the window on the top of the stack */
+    xcb_map_window(xcbConnectionValue, win);
     xcb_configure_window(xcbConnectionValue, win, XCB_CONFIG_WINDOW_STACK_MODE, values);
-    xcb_client_message_event_t event;
-
-    event.response_type = XCB_CLIENT_MESSAGE;
-    event.window = win;
-    event.type = atom(XcbAtom::Atom::_NET_ACTIVE_WINDOW);
-    event.format = 32;
-    event.data.data32[0] = 1;
-    event.data.data32[1] = XCB_CURRENT_TIME;
-    event.data.data32[2] = XCB_NONE;
-    event.data.data32[3] = 0;
-    event.data.data32[4] = 0;
-
-    xcb_send_event(xcbConnectionValue, false, rootWindowValue,
-                   XCB_EVENT_MASK_STRUCTURE_NOTIFY | XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT,
-                   (char *) &event);
 }
 
 void XcbInitializer::setWindowState(const xcb_window_t &win, uint32_t state) {

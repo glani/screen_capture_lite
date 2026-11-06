@@ -316,7 +316,6 @@ namespace Screen_Capture {
         std::shared_ptr<Window> res;
         XcbInitializer xcbInstance;
         if (xcbInstance.isValid() && xcbInstance.windowExists(windowRequest.Handle)) {
-            xcbInstance.visible(windowRequest.Handle, true);
             xcbInstance.activate(windowRequest.Handle);
             xcbInstance.flush();
 

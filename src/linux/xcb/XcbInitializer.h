@@ -66,6 +66,9 @@ public:
     // The window manager lists `feature` (an atom) in the root's _NET_SUPPORTED.
     bool wmSupports(xcb_atom_t feature);
 
+    // The X server's current time (for EWMH requests that need a real timestamp); XCB_CURRENT_TIME on failure.
+    xcb_timestamp_t serverTime();
+
     void rectangle(const xcb_window_t& win, const SL::Screen_Capture::Point &point, const SL::Screen_Capture::SizeValues &values);
 
     void flush();
