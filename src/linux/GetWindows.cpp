@@ -84,7 +84,9 @@ auto TextPropertyToStrings(Display *dpy, const XTextProperty &prop)
         }
     }
     if (retList) {
-        free(*retList);
+        // Xutf8TextPropertyToTextList allocates the pointer array and one buffer for all strings; XFreeStringList
+        // frees both (free(*retList) alone lost the array). Also needed when ret > 0 (unconvertible characters).
+        XFreeStringList(retList);
     }
 
     return result;
