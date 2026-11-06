@@ -11,6 +11,7 @@
 #include <psapi.h>
 #include <shellapi.h>
 #include <ShlObj.h>
+#include <ShlDisp.h>
 #include "internal/SCShared.h"
 #include <UIAutomation.h>
 #include <wrl/client.h>
@@ -69,14 +70,17 @@ namespace SL {
         void fillIconsIfNeeded(Window &window, HICON hIcon, bool retrieveIcons);
 
 
+        // show: minimise all windows (the shell's "Minimize all", Win+M); !show: undo that. Through the documented
+        // Shell.Application object. The old code sent Progman 0x052C (the message that spawns the wallpaper WorkerW)
+        // and WM_SETTINGCHANGE, neither of which shows the desktop, and reported success when SendMessageTimeout
+        // failed (it returns 0 on failure).
         std::shared_ptr<ShowingDesktopResult> ShowingDesktop(bool show) {
             auto result = std::make_shared<ShowingDesktopResult>();
             result->success = false;
-            HWND progman = FindWindow(L"Progman", L"Program Manager");
-            if (progman != NULL) {
-                // Send the message to show / hide the desktop
-                auto res = SendMessageTimeout(progman, show ? 0x052C : 0x001A, 0, 0, SMTO_NORMAL, 1000, NULL);
-                result->success = res == 0;
+            ComApartment com;
+            Microsoft::WRL::ComPtr<IShellDispatch> shell;
+            if (SUCCEEDED(CoCreateInstance(__uuidof(Shell), NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&shell)))) {
+                result->success = SUCCEEDED(show ? shell->MinimizeAll() : shell->UndoMinimizeALL());
             }
             return result;
         }
