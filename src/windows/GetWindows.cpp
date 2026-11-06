@@ -3,6 +3,7 @@
 #include "internal/SCCommon.h"
 #include "stringhelper.h"
 #include <algorithm>
+#include <climits>
 
 #define WIN32_LEAN_AND_MEAN // Exclude rarely-used stuff from Windows headers
 
@@ -720,29 +721,44 @@ namespace SL {
         }
 
         std::shared_ptr<std::string> retrieveBase64IconData(HICON hIcon) {
-            ICONINFO infoIconProcess;
-            GetIconInfo(hIcon, &infoIconProcess);
+            // GetIconInfo hands out copies of the icon's bitmaps, which are ours to delete (once). If it fails,
+            // nothing was written: the old code went on and DeleteObject'ed whatever was on the stack.
+            ICONINFO infoIconProcess = {};
+            if (!GetIconInfo(hIcon, &infoIconProcess)) {
+                return nullptr;
+            }
             std::shared_ptr<std::string> result;
 
             // Create bitmap from icon data
             BITMAP bmp = {};
-            GetObject(infoIconProcess.hbmColor, sizeof(BITMAP), &bmp);
-            BITMAPINFO bmi = {};
-            bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-            bmi.bmiHeader.biWidth = bmp.bmWidth;
-            bmi.bmiHeader.biHeight = -bmp.bmHeight;
-            bmi.bmiHeader.biPlanes = 1;
-            bmi.bmiHeader.biBitCount = bmp.bmBitsPixel;
-            bmi.bmiHeader.biCompression = BI_RGB;
+            if (infoIconProcess.hbmColor != NULL) {  // no colour bitmap: a monochrome icon, not encoded
+                GetObject(infoIconProcess.hbmColor, sizeof(BITMAP), &bmp);
+            }
+            HBITMAP hBitmap = NULL;
+            HDC hMemDC = NULL;
+            HGDIOBJ hOldBitmap = NULL;
             BYTE *pBits = NULL;
-            HBITMAP hBitmap = CreateDIBSection(NULL, &bmi, DIB_RGB_COLORS, (void **) &pBits, NULL, 0);
-            HDC hMemDC = CreateCompatibleDC(NULL);
-            HBITMAP hOldBitmap = (HBITMAP) SelectObject(hMemDC, hBitmap);
-            if (DrawIconEx(hMemDC, 0, 0, hIcon, bmp.bmWidth, bmp.bmHeight, 0, NULL, DI_NORMAL)) {
-                auto bytes = bmi.bmiHeader.biBitCount / 8;
-                auto biSizeImage = bmp.bmWidth * bmp.bmHeight * bytes;
+            if (bmp.bmWidth > 0 && bmp.bmHeight > 0) {
+                BITMAPINFO bmi = {};
+                bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+                bmi.bmiHeader.biWidth = bmp.bmWidth;
+                bmi.bmiHeader.biHeight = -bmp.bmHeight;
+                bmi.bmiHeader.biPlanes = 1;
+                // Always 32 bpp: the PNG below is encoded as RGBA, i.e. reads width * height * 4 bytes. With the
+                // icon's own depth (16 or 24 bpp, e.g. a DDB on a 16-bit display) that read ran past the DIB.
+                bmi.bmiHeader.biBitCount = 32;
+                bmi.bmiHeader.biCompression = BI_RGB;
+                hBitmap = CreateDIBSection(NULL, &bmi, DIB_RGB_COLORS, (void **) &pBits, NULL, 0);
+                hMemDC = hBitmap != NULL ? CreateCompatibleDC(NULL) : NULL;
+                hOldBitmap = hMemDC != NULL ? SelectObject(hMemDC, hBitmap) : NULL;
+            }
+            if (hOldBitmap != NULL && pBits != NULL &&
+                DrawIconEx(hMemDC, 0, 0, hIcon, bmp.bmWidth, bmp.bmHeight, 0, NULL, DI_NORMAL)) {
+                GdiFlush();  // the DIB is read directly below
+                const size_t bytes = 4;
+                const size_t biSizeImage = static_cast<size_t>(bmp.bmWidth) * bmp.bmHeight * bytes;
                 // Iterate through the bitmap data and swap the red and blue components
-                for (int i = 0; i < biSizeImage; i +=  bytes)
+                for (size_t i = 0; i < biSizeImage; i += bytes)
                 {
                     BYTE temp = pBits[i];
                     pBits[i] = pBits[i + 2];
@@ -765,12 +781,22 @@ namespace SL {
                 result = nullptr;
             }
 
-            // Clean up
-            DeleteObject(infoIconProcess.hbmColor);
-            DeleteObject(infoIconProcess.hbmMask);
-            DeleteObject(hBitmap);
-            SelectObject(hMemDC, hOldBitmap);
-            DeleteDC(hMemDC);
+            // Clean up: deselect the DIB before deleting it (DeleteObject's contract: not while selected into a DC)
+            if (hMemDC != NULL) {
+                if (hOldBitmap != NULL) {
+                    SelectObject(hMemDC, hOldBitmap);
+                }
+                DeleteDC(hMemDC);
+            }
+            if (hBitmap != NULL) {
+                DeleteObject(hBitmap);
+            }
+            if (infoIconProcess.hbmColor != NULL) {
+                DeleteObject(infoIconProcess.hbmColor);
+            }
+            if (infoIconProcess.hbmMask != NULL) {
+                DeleteObject(infoIconProcess.hbmMask);
+            }
 
             return result;
         }
@@ -784,10 +810,14 @@ namespace SL {
                 return nullptr;
             }
 
-            // Extract the icon
-            HICON hIcon;
-            HICON hIconLarge;
-            ExtractIconEx(&path[0], 0, &hIconLarge, &hIcon, 1);
+            // Extract the icon. ExtractIconEx writes nothing when the file has no icon (returns 0) or on error
+            // (UINT_MAX); the handles were uninitialised then and went on to fillIconsIfNeeded and DestroyIcon.
+            HICON hIcon = NULL;
+            HICON hIconLarge = NULL;
+            UINT extracted = ExtractIconEx(&path[0], 0, &hIconLarge, &hIcon, 1);
+            if (extracted == 0 || extracted == UINT_MAX || (hIcon == NULL && hIconLarge == NULL)) {
+                return nullptr;
+            }
             return std::make_shared<std::pair<HICON, HICON>>(std::make_pair(hIcon, hIconLarge));
         }
 
