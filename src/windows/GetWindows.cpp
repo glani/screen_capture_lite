@@ -485,10 +485,70 @@ namespace SL {
             return nullptr;
         }
 
-        // Close all windows / terminate application
+        // Close all windows / terminate the application of the window. It used to do nothing and report success, so
+        // MCP close_window with scope "application" closed nothing. macOS asks the application to quit
+        // (NSRunningApplication terminate / forceTerminate). Here:
+        //  - force: the window's process is ended (TerminateProcess, as CloseWindow(force) does);
+        //  - otherwise WM_CLOSE is posted to every window of that process that GetWindows would list (cloaked ones,
+        //    e.g. on another virtual desktop, included), and to the requested window itself: what closing each of them
+        //    by hand does, so an application with unsaved work asks first. Posted, not sent (see CloseWindow).
+        //  - a UWP frame (ApplicationFrameWindow) belongs to ApplicationFrameHost.exe, which hosts the frames of all UWP
+        //    apps: only that frame gets WM_CLOSE, and force ends the app process behind it (the process of the frame's
+        //    CoreWindow), never the host; without a CoreWindow (a suspended app) force does nothing.
+        // Result: nullptr if the handle is not a window or nothing could be posted / terminated.
+        struct CloseAllContext {
+            DWORD Pid;
+            HWND Requested;
+            int Posted;
+            bool RequestedPosted;
+        };
+
         std::shared_ptr<EmptyResult> CloseAllWindows(const SingleWindowRequest &windowRequest, bool force) {
-            // not supported
-            return std::make_shared<EmptyResult>();
+            HWND hwnd = reinterpret_cast<HWND>(windowRequest.Handle);
+            if (!IsWindow(hwnd)) {
+                return nullptr;
+            }
+            DWORD pid = 0;
+            GetWindowThreadProcessId(hwnd, &pid);
+            wchar_t className[64] = {0};
+            const bool uwpFrame = GetClassNameW(hwnd, className, 64) && lstrcmpW(className, L"ApplicationFrameWindow") == 0;
+            if (uwpFrame) {
+                if (!force) {
+                    return PostMessage(hwnd, WM_CLOSE, 0, 0) ? std::make_shared<EmptyResult>() : nullptr;
+                }
+                HWND core = FindWindowExW(hwnd, nullptr, L"Windows.UI.Core.CoreWindow", nullptr);
+                DWORD corePid = 0;
+                if (!core || !GetWindowThreadProcessId(core, &corePid) || corePid == 0 || corePid == pid) {
+                    return nullptr;
+                }
+                pid = corePid;
+            }
+            if (force) {
+                HANDLE hProcess = pid ? OpenProcess(PROCESS_TERMINATE, FALSE, pid) : NULL;
+                if (!hProcess) {
+                    return nullptr;
+                }
+                const BOOL terminated = TerminateProcess(hProcess, 0);
+                CloseHandle(hProcess);
+                return terminated ? std::make_shared<EmptyResult>() : nullptr;
+            }
+            CloseAllContext context = {pid, hwnd, 0, false};
+            ::EnumWindows(
+                [](HWND h, LPARAM lParam) -> BOOL {
+                    auto *c = reinterpret_cast<CloseAllContext *>(lParam);
+                    DWORD windowPid = 0;
+                    GetWindowThreadProcessId(h, &windowPid);
+                    if (windowPid == c->Pid && !filterOutWindow(h) && PostMessage(h, WM_CLOSE, 0, 0)) {
+                        c->Posted++;
+                        c->RequestedPosted = c->RequestedPosted || h == c->Requested;
+                    }
+                    return TRUE;
+                },
+                reinterpret_cast<LPARAM>(&context));
+            if (!context.RequestedPosted && PostMessage(hwnd, WM_CLOSE, 0, 0)) {
+                context.Posted++;
+            }
+            return context.Posted ? std::make_shared<EmptyResult>() : nullptr;
         }
 
         // Close window
