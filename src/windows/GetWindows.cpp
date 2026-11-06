@@ -488,11 +488,10 @@ namespace SL {
             w.Name = std::string();
 
             auto length = 4096;
-            auto buffer = new wchar_t[length];
-            std::unique_ptr<wchar_t> _(buffer);
-            auto textlen = GetWindowText(hwnd, buffer, length);
+            std::unique_ptr<wchar_t[]> buffer(new wchar_t[length]);  // new[] needs delete[] (was unique_ptr<wchar_t>)
+            auto textlen = GetWindowText(hwnd, buffer.get(), length);
             if (textlen >= 0) {
-                w.Name = StringHelper::ws2s(std::wstring(buffer, textlen));
+                w.Name = StringHelper::ws2s(std::wstring(buffer.get(), textlen));
             }
 
             w.Handle = reinterpret_cast<size_t>(hwnd);
@@ -750,8 +749,8 @@ namespace SL {
                     pBits[i + 2] = temp;
                 }
                 // Create image from bitmap data
-                unsigned char *pngData;
-                size_t outsize;
+                unsigned char *pngData = nullptr;
+                size_t outsize = 0;
                 unsigned int pngEncResult = lodepng_encode_memory(&pngData, &outsize, pBits, bmp.bmWidth, bmp.bmHeight,
                                                                   LCT_RGBA, 8);
 
@@ -761,7 +760,7 @@ namespace SL {
                     auto iconStrValue = base64_encode(pngData, outsize, std::string("data:image/png;base64,"), false);
                     result = std::make_shared<std::string>(iconStrValue);
                 }
-                delete[] pngData;
+                free(pngData);  // lodepng allocates with malloc (lodepng_malloc), not new[]
             } else {
                 result = nullptr;
             }
