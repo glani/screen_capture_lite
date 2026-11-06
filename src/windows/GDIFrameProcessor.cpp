@@ -22,11 +22,9 @@ namespace Screen_Capture {
     }
     DUPL_RETURN GDIFrameProcessor::Init(std::shared_ptr<Thread_Data> data, const Window &selectedwindow)
     {
-        // this is needed to fix AERO BitBlt capturing issues
-        ANIMATIONINFO str;
-        str.cbSize = sizeof(str);
-        str.iMinAnimate = 0;
-        SystemParametersInfo(SPI_SETANIMATION, sizeof(str), (void *)&str, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
+        // No SystemParametersInfo(SPI_SETANIMATION, iMinAnimate = 0, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE) here any
+        // more ("to fix AERO BitBlt capturing issues"): it switched off the user's minimize/maximize animation for
+        // good, written to their profile, as a side effect of starting a window capture.
 
         SelectedWindow = reinterpret_cast<HWND>(selectedwindow.Handle);
         auto Ret = DUPL_RETURN_SUCCESS;
