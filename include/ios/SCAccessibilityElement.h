@@ -2,6 +2,19 @@
 
 #import <Carbon/Carbon.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+/**
+ * The pid of the frontmost application, read fresh on every call (0 if unknown). NSWorkspace.frontmostApplication is
+ * NOT fresh off the main run loop: in SMBAct's engine and renderer it stays at the first value it read, so the "active
+ * window" (and every layout hotkey) followed a stale app (smpostio-utils tests/macos/activation, probe `front`).
+ */
+pid_t SCCurrentFrontmostPid(void);
+#ifdef __cplusplus
+}
+#endif
+
 @interface NSWindowDataRequest : NSObject
 @property(nonatomic) int pid;
 @property(nonatomic) uint32_t handle;

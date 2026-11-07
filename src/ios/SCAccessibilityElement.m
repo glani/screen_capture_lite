@@ -1,6 +1,43 @@
 #import "SCAccessibilityElement.h"
 
 #import <AppKit/AppKit.h>
+#include <dlfcn.h>
+
+// Sources, in order (probe `front` on macOS 27.2, from a thread without a run loop):
+//   1. Carbon GetFrontProcess + GetProcessPID: always right, also for an app without windows, ~20 us. Deprecated since
+//      10.9 but present; looked up at run time so a future removal only drops to the next source.
+//   2. AX: the system-wide element's focused application: right while the app has a window, 0.5-50 ms.
+//   3. NSWorkspace.frontmostApplication: only fresh on a thread that runs the main run loop.
+pid_t SCCurrentFrontmostPid(void) {
+    typedef OSStatus (*GetFrontProcessFn)(ProcessSerialNumber *);
+    typedef OSStatus (*GetProcessPIDFn)(const ProcessSerialNumber *, pid_t *);
+    static GetFrontProcessFn getFrontProcess = NULL;
+    static GetProcessPIDFn getProcessPID = NULL;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        getFrontProcess = (GetFrontProcessFn) dlsym(RTLD_DEFAULT, "GetFrontProcess");
+        getProcessPID = (GetProcessPIDFn) dlsym(RTLD_DEFAULT, "GetProcessPID");
+    });
+    if (getFrontProcess && getProcessPID) {
+        ProcessSerialNumber psn = {0, 0};
+        pid_t pid = 0;
+        if (getFrontProcess(&psn) == noErr && getProcessPID(&psn, &pid) == noErr && pid > 0) {
+            return pid;
+        }
+    }
+    pid_t pid = 0;
+    AXUIElementRef systemWide = AXUIElementCreateSystemWide();
+    AXUIElementRef app = NULL;
+    if (AXUIElementCopyAttributeValue(systemWide, kAXFocusedApplicationAttribute, (CFTypeRef *) &app) == kAXErrorSuccess && app) {
+        AXUIElementGetPid(app, &pid);
+        CFRelease(app);
+    }
+    CFRelease(systemWide);
+    if (pid > 0) {
+        return pid;
+    }
+    return [NSWorkspace sharedWorkspace].frontmostApplication.processIdentifier;
+}
 
 typedef AXError (*ElementGetWindowID)(AXUIElementRef, CGWindowID *);
 
@@ -117,8 +154,7 @@ const CFStringRef kAXEnhancedUserInterface = @"AXEnhancedUserInterface";
 }
 
 + (SCAccessibilityElement *)frontmostApplicationElement {
-    NSRunningApplication *frontmostApplication = [NSWorkspace sharedWorkspace].frontmostApplication;
-    pid_t pid = frontmostApplication.processIdentifier;
+    pid_t pid = SCCurrentFrontmostPid(); // not NSWorkspace.frontmostApplication: stale off the main run loop
     return [self createApplicationElement:pid];
 }
 

@@ -127,7 +127,14 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
     CFMutableDictionaryRef query = CFDictionaryCreateMutable(NULL, 0, &kCFTypeDictionaryKeyCallBacks,
                                                              &kCFTypeDictionaryValueCallBacks);
     @autoreleasepool {
-        auto application = [[NSWorkspace sharedWorkspace] frontmostApplication];
+        // fresh pid (SCCurrentFrontmostPid), then a fresh NSRunningApplication: NSWorkspace.frontmostApplication stays at
+        // its first value in a process whose main thread does not run the AppKit loop (the engine, a renderer)
+        pid_t frontPid = SCCurrentFrontmostPid();
+        NSRunningApplication *application =
+                frontPid > 0 ? [NSRunningApplication runningApplicationWithProcessIdentifier:frontPid] : nil;
+        if (!application) {
+            application = [[NSWorkspace sharedWorkspace] frontmostApplication];
+        }
 
         if (application) {
             auto pid = application.processIdentifier;
