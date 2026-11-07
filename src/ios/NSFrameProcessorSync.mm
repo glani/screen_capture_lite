@@ -161,6 +161,7 @@ namespace SL {
 
             if (stream != nil) {
                 CGDisplayStreamStop(stream);
+                CFRelease(stream); // Create rule; the stream was never started
                 return DUPL_RETURN::DUPL_RETURN_SUCCESS;
             }
             return DUPL_RETURN::DUPL_RETURN_ERROR_EXPECTED;

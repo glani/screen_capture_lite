@@ -25,7 +25,15 @@ const CFStringRef kAXEnhancedUserInterface = @"AXEnhancedUserInterface";
 @end
 
 @implementation SCWindowData
+// Owns every CF value it holds: processTitle (CFRetain in createWindowFromSCAccessibilityElement), title and the
+// booleans (CFRetain in -enrich:). The properties are `assign`, so the setters are not used to change a value twice.
 - (void)dealloc {
+    if (_processTitle) {
+        CFRelease(_processTitle);
+    }
+    if (_title) {
+        CFRelease(_title);
+    }
     if (_focused) {
         CFRelease(_focused);
     }
@@ -34,6 +42,9 @@ const CFStringRef kAXEnhancedUserInterface = @"AXEnhancedUserInterface";
     }
     if (_minimized) {
         CFRelease(_minimized);
+    }
+    if (_fullscreen) {
+        CFRelease(_fullscreen);
     }
 
     [super dealloc];
@@ -119,6 +130,7 @@ const CFStringRef kAXEnhancedUserInterface = @"AXEnhancedUserInterface";
         if (!frontmostWindowElement) {
             NSLog(@"Invalid accessibility element provided, unable to determine the size and position of the window.");
         }
+        [frontmostApplicationElement release]; // +1 from createApplicationElement; the window element has no parent
     } else {
         NSLog(@"Failed to find the application that currently has focus.");
     }
@@ -143,6 +155,7 @@ const CFStringRef kAXEnhancedUserInterface = @"AXEnhancedUserInterface";
         if (!frontmostWindowElement) {
             NSLog(@"Invalid accessibility element provided, unable to determine the size and position of the window.");
         }
+        [frontmostApplicationElement release]; // +1 from createApplicationElement; the window element has no parent
     } else {
         NSLog(@"Failed to find the application that currently has focus.");
     }
@@ -206,6 +219,9 @@ const CFStringRef kAXEnhancedUserInterface = @"AXEnhancedUserInterface";
         if ((result == kAXErrorSuccess) && (AXValueGetType((AXValueRef) value) == type)) {
             return (AXValueRef) value;
         } else {
+            if (result == kAXErrorSuccess && value) {
+                CFRelease(value); // copied (+1) but of another type: not returned, so released here
+            }
             NSLog(@"There was a problem getting the value of the specified attribute: %@ (error code %d)", attribute,
                   result);
         }
@@ -228,12 +244,17 @@ const CFStringRef kAXEnhancedUserInterface = @"AXEnhancedUserInterface";
     CGPoint position;
     CGSize size;
 
-    AXValueGetValue((AXValueRef) positionValue, kAXValueTypeCGPoint, (void *) &position);
-    AXValueGetValue((AXValueRef) sizeValue, kAXValueTypeCGSize, (void *) &size);
     if ((positionValue != NULL) && (sizeValue != NULL)) {
-        CFRelease(positionValue);
-        CFRelease(sizeValue);
+        AXValueGetValue((AXValueRef) positionValue, kAXValueTypeCGPoint, (void *) &position);
+        AXValueGetValue((AXValueRef) sizeValue, kAXValueTypeCGSize, (void *) &size);
         result = CGRectMake(position.x, position.y, size.width, size.height);
+    }
+    // both are copies (+1); release each one that came back, also when the other did not
+    if (positionValue) {
+        CFRelease(positionValue);
+    }
+    if (sizeValue) {
+        CFRelease(sizeValue);
     }
     return result;
 }
@@ -276,21 +297,37 @@ const CFStringRef kAXEnhancedUserInterface = @"AXEnhancedUserInterface";
     return [[self stringValueOfAttribute:kAXSubroleAttribute] isEqualToString:(__bridge NSString *) kAXSystemDialogSubrole];
 }
 
+// MRC. Without [super dealloc] no element was ever freed, which also hid an over-release in
+// determineWindowsByProcessId (fixed together, leak report H1); and the parent retained in setParent: was never
+// released, so every application element (and its AXUIElementRef) leaked.
 - (void)dealloc {
     if (_underlyingElement != NULL) {
         CFRelease(_underlyingElement);
     }
+    if (_parent != NULL) {
+        CFRelease(_parent);
+    }
+    [super dealloc];
 }
 
 - (void)setUnderlyingElement:(AXUIElementRef)underlyingElement {
+    if (underlyingElement != NULL) {
+        CFRetain(underlyingElement);
+    }
     if (_underlyingElement != NULL) {
         CFRelease(_underlyingElement);
     }
-    _underlyingElement = (AXUIElementRef) CFRetain(underlyingElement);
+    _underlyingElement = underlyingElement;
 }
 
 - (void)setParent:(SCAccessibilityElement *)parent {
-    _parent = (SCAccessibilityElement *) CFRetain(parent);
+    if (parent != NULL) {
+        CFRetain(parent);
+    }
+    if (_parent != NULL) {
+        CFRelease(_parent);
+    }
+    _parent = parent;
 }
 
 - (void)setPid:(pid_t)pid {
@@ -317,10 +354,10 @@ const CFStringRef kAXEnhancedUserInterface = @"AXEnhancedUserInterface";
         cgWindowId = 0;
     }
     CGRect rect = [self rectOfElement];
-    NSString *title = [self stringValueOfAttribute:kAXTitleAttribute];
+    NSString *title = [self stringValueOfAttribute:kAXTitleAttribute]; // autoreleased (+0)
     if (title) {
+        // the window owns it (released in -[SCWindowData dealloc]), so it no longer depends on when a pool drains
         window.title = (CFStringRef) CFRetain((__bridge CFStringRef) title);
-        CFRelease(title);
     } else {
         window.title = nil;
     }

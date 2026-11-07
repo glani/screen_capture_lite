@@ -72,7 +72,7 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
             if (windowSCData) {
                 [windows addObject:windowSCData];
             }
-            [window release];
+            // no [window release]: the elements belong to the windows list (-deallocWindowsList releases them)
         }
         [accessibilityElementAllWindows release];
     }
@@ -178,6 +178,7 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
             res = [self createWindowFromSCAccessibilityElement:pid :windowsElement :windowRes];
         }
         [windowsElement release];
+        [appElement release]; // +1 from createApplicationElement
     }
     return res;
 }
@@ -201,6 +202,7 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
             res = [self createWindowFromSCAccessibilityElement:pid :windowsElement :windowRes];
         }
         [windowsElement release];
+        [appElement release]; // +1 from createApplicationElement
     }
     return res;
 }
@@ -224,6 +226,7 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
             res = [self createWindowFromSCAccessibilityElement:pid :windowsElement :windowRes];
         }
         [windowsElement release];
+        [appElement release]; // +1 from createApplicationElement
     }
     return res;
 }
@@ -246,6 +249,7 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
             res = [windowRes closeWindow:force];
         }
         [windowsElement release];
+        [appElement release]; // +1 from createApplicationElement
         return res;
     }
     return false;
@@ -270,6 +274,7 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
             res = [self createWindowFromSCAccessibilityElement:pid :windowsElement :windowRes];
         }
         [windowsElement release];
+        [appElement release]; // +1 from createApplicationElement
     }
     return res;
 }
@@ -292,6 +297,7 @@ extern const CFStringRef kWindowRectangle = CFSTR("kWindowRectangle");
             res = [self createWindowFromSCAccessibilityElement:pid :windowsElement :windowRes];
         }
         [windowsElement release];
+        [appElement release]; // +1 from createApplicationElement
     }
     return res;
 }
@@ -578,6 +584,11 @@ namespace SL {
                         icon = retrieveIconFromApplication(application);
                     }
                     this->processWindows(windows, pid, data.get(), execute, icon);
+                } else {
+                    // processWindows hands back the +1 of each SCWindowData; without it they are released here
+                    for (SCWindowData *window in windows) {
+                        CFRelease(window);
+                    }
                 }
                 CFRelease(windows);
                 return data;
@@ -603,7 +614,10 @@ namespace SL {
                         const CGRect &rect = CGRectMake(0, 0, 512, 512);
                         NSBitmapImageRep *imageHighRes = [image bestRepresentationForRect:rect context:nil hints:nil];
                         if (imageHighRes) {
+                            // imageHighRes is +0 (owned by image); img (+1) is ours. Before, img leaked and an extra
+                            // [imageHighRes autorelease] was balanced only by that leak (leak report H2).
                             auto img = [[NSImage alloc] initWithSize:[imageHighRes size]];
+                            [img autorelease];
                             [img addRepresentation:imageHighRes];
 
                             CGImageRef cgRef = [img CGImageForProposedRect:NULL context:nil hints:nil];
@@ -616,7 +630,6 @@ namespace SL {
                             NSString *value = [NSString stringWithFormat:@"data:image/png;base64,%@", encodedString];
                             CFStringRef valueCSStr = (__bridge CFStringRef) value;
                             icon = getString(valueCSStr);
-                            [imageHighRes autorelease];
                             [newRep autorelease];
                         } else {
                             CGImageRef cgRef = [image CGImageForProposedRect:NULL context:nil hints:nil];
@@ -706,69 +719,73 @@ namespace SL {
             }
         }
 
+        // The C++ entry points (NSWorkspaceWrapper.cpp). They run on libuv threadpool threads, which have no autorelease
+        // pool: without one, everything autoreleased here (NSRunningApplication, executableURL strings, window titles,
+        // icons) stayed until the thread exited, i.e. forever. A pool at this outermost boundary only: everything handed
+        // back is C++ by then (getString copies), and nothing inside depends on a pool draining earlier (leak report H4).
         CFDictionaryRef
-        determineFrontmostApplicationWrap(NSWorkspaceWrapperImpl *p) { return p->determineFrontmostApplication(); }
+        determineFrontmostApplicationWrap(NSWorkspaceWrapperImpl *p) { @autoreleasepool { return p->determineFrontmostApplication(); } }
 
         Boolean
-        requestAccessibilityPermissionsWrap(NSWorkspaceWrapperImpl *p) { return p->requestAccessibilityPermissions(); }
+        requestAccessibilityPermissionsWrap(NSWorkspaceWrapperImpl *p) { @autoreleasepool { return p->requestAccessibilityPermissions(); } }
 
         std::shared_ptr<std::map<int, struct ApplicationData>>
         determineApplicationValuesWrap(NSWorkspaceWrapperImpl *p) {
-            return p->determineApplicationValues();
+            @autoreleasepool { return p->determineApplicationValues(); }
         }
 
         std::shared_ptr<std::vector<struct WindowData>>
         determineWindowsWrap(NSWorkspaceWrapperImpl *p, int pid, bool retrieveIcon) {
-            return p->determineWindows(pid, retrieveIcon);
+            @autoreleasepool { return p->determineWindows(pid, retrieveIcon); }
         }
 
         std::shared_ptr<std::vector<struct WindowData>>
-        determineWindowsWrap(NSWorkspaceWrapperImpl *p, bool retrieveIcon) { return p->determineWindows(retrieveIcon); }
+        determineWindowsWrap(NSWorkspaceWrapperImpl *p, bool retrieveIcon) { @autoreleasepool { return p->determineWindows(retrieveIcon); } }
 
         std::shared_ptr<struct WindowData>
         minimizeWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest &windowRequest, bool minimize) {
-            return p->minimizeWindow(windowRequest, minimize);
+            @autoreleasepool { return p->minimizeWindow(windowRequest, minimize); }
         }
 
         std::shared_ptr<struct WindowData>
         fullscreenWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest &windowRequest, int display,
                              bool fullscreen) {
-            return p->fullscreenWindow(windowRequest, display, fullscreen);
+            @autoreleasepool { return p->fullscreenWindow(windowRequest, display, fullscreen); }
         }
 
         std::shared_ptr<struct WindowData>
         rectWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest &windowRequest, const CGRect &rect) {
-            return p->rectWindow(windowRequest, rect);
+            @autoreleasepool { return p->rectWindow(windowRequest, rect); }
         }
 
         bool closeWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest& windowRequest, bool force) {
-            return p->closeWindow(windowRequest, force);
+            @autoreleasepool { return p->closeWindow(windowRequest, force); }
         }
 
         bool closeAllWindowsWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest& windowRequest, bool force) {
-            return p->closeAllWindows(windowRequest, force);
+            @autoreleasepool { return p->closeAllWindows(windowRequest, force); }
         }
 
 
         std::shared_ptr<struct WindowData>
         topMostWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest &windowRequest) {
-            return p->topMostWindow(windowRequest);
+            @autoreleasepool { return p->topMostWindow(windowRequest); }
         }
 
         std::shared_ptr<struct WindowData>
         activateWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest &windowRequest) {
-            return p->activateWindow(windowRequest);
+            @autoreleasepool { return p->activateWindow(windowRequest); }
         }
 
         std::shared_ptr<struct WindowData>
         getWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest &windowRequest) {
-            return p->getWindow(windowRequest);
+            @autoreleasepool { return p->getWindow(windowRequest); }
         }
 
 
         std::shared_ptr<struct NativeWindowData>
         nativeWindowInfoWrap(NSWorkspaceWrapperImpl *p, char* data, size_t sz) {
-            return p->nativeWindowInfo(data, sz);
+            @autoreleasepool { return p->nativeWindowInfo(data, sz); }
         }
 
 
