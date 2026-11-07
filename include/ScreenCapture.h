@@ -322,6 +322,11 @@ namespace Screen_Capture {
     // Native window info
     SC_LITE_EXTERN std::shared_ptr<NativeWindow> NativeWindowInfo(char* data, const size_t sz);
 
+    // Activate an application (macOS: NSRunningApplication activateWithOptions; elsewhere false, activation goes through
+    // Activate/Topmost). Meant for a thread with a run loop (the app's main thread): from a thread without one, macOS 14+
+    // waits ~1 s for the cooperative-activation reply (tests/macos/activation).
+    SC_LITE_EXTERN bool ActivateApplication(int pid);
+
     // will return active window
     SC_LITE_EXTERN std::shared_ptr<Window> GetActiveWindow(const SharedWindowsRequest &request);
     // will return requested window

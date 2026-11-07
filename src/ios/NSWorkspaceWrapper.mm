@@ -6,6 +6,7 @@
 #include <map>
 #include <vector>
 #include <iostream>
+#include <unistd.h>
 
 extern const CFStringRef kWindowPid = CFSTR("kWindowPid");
 extern const CFStringRef kWindowAbsoluteUrlString = CFSTR("kWindowAbsoluteUrlString");
@@ -400,6 +401,44 @@ namespace SL {
             }
 
 
+            // Activation from this module runs on a libuv thread, which has no run loop: there macOS 14+'s
+            // activateWithOptions: waits ~1 s for the cooperative-activation reply even for an app that is already
+            // active (tests/macos/activation). So skip it when the app is active already (the caller activated it from a
+            // thread with a run loop, e.g. SMBAct's main process via ActivateApplication), and only pick the window
+            // (AXMain) then. A fresh NSRunningApplication's `active` is current here; NSWorkspace.frontmostApplication is
+            // not (it is updated on the main run loop).
+            static void activateUnlessActive(NSRunningApplication *application) {
+                if (!application.active) {
+                    [application activateWithOptions:NSApplicationActivateIgnoringOtherApps];
+                }
+            }
+
+            /** ActivateApplication: for a thread with a run loop (SMBAct's main process); ~65 ms there. */
+            bool activateApplication(int pid) {
+                auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
+                if (!application) {
+                    return false;
+                }
+                if (application.active) {
+                    return true;
+                }
+                if (![application activateWithOptions:NSApplicationActivateIgnoringOtherApps]) {
+                    return false;
+                }
+                // The call returns before the switch is done (~10 ms vs ~50 ms). Wait for it, so that the window engine's
+                // next call (Topmost/Activate: AXMain) finds the app active and skips its own activation. Fresh objects:
+                // `active` of an old one is updated on the run loop. At most ~0.5 s.
+                for (int i = 0; i < 50; i++) {
+                    @autoreleasepool {
+                        if ([NSRunningApplication runningApplicationWithProcessIdentifier:pid].active) {
+                            return true;
+                        }
+                    }
+                    usleep(10000);
+                }
+                return false;
+            }
+
             std::shared_ptr<struct NativeWindowData> nativeWindowInfo(char* data, size_t sz) {
                 auto res = std::make_shared<struct NativeWindowData>((NativeWindowData){});
                 NSView* view = *reinterpret_cast<NSView**>(data);
@@ -470,7 +509,7 @@ namespace SL {
                 auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
                 std::shared_ptr<std::string> execute;
                 if (application) {
-                    [application activateWithOptions:NSApplicationActivateIgnoringOtherApps];
+                    activateUnlessActive(application);
                     std::shared_ptr<std::string> icon;
                     if (windowRequest.retrieveIcon) {
                         icon = retrieveIconFromApplication(application);
@@ -498,7 +537,7 @@ namespace SL {
                 auto application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
                 std::shared_ptr<std::string> execute;
                 if (application) {
-                    [application activateWithOptions:NSApplicationActivateIgnoringOtherApps];
+                    activateUnlessActive(application);
                     std::shared_ptr<std::string> icon;
                     if (windowRequest.retrieveIcon) {
                         icon = retrieveIconFromApplication(application);
@@ -782,6 +821,10 @@ namespace SL {
             @autoreleasepool { return p->getWindow(windowRequest); }
         }
 
+
+        bool activateApplicationWrap(NSWorkspaceWrapperImpl *p, int pid) {
+            @autoreleasepool { return p->activateApplication(pid); }
+        }
 
         std::shared_ptr<struct NativeWindowData>
         nativeWindowInfoWrap(NSWorkspaceWrapperImpl *p, char* data, size_t sz) {

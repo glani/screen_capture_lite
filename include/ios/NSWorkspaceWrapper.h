@@ -31,6 +31,7 @@ namespace Screen_Capture {
     std::shared_ptr<struct WindowData> activateWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest& windowRequest);
     std::shared_ptr<struct WindowData> getWindowWrap(NSWorkspaceWrapperImpl *p, const WindowDataRequest& windowRequest);
     std::shared_ptr<struct NativeWindowData> nativeWindowInfoWrap(NSWorkspaceWrapperImpl *p, char* data, size_t sz);
+    bool activateApplicationWrap(NSWorkspaceWrapperImpl *p, int pid);
 
     class NSWorkspaceWrapper {
         NSWorkspaceWrapperImpl *NSWorkspaceWrapperImpl_ = nullptr;
@@ -60,6 +61,7 @@ namespace Screen_Capture {
         std::shared_ptr<struct WindowData> activate(const WindowDataRequest& windowRequest);
         std::shared_ptr<struct WindowData> getWindow(const WindowDataRequest& windowRequest);
         std::shared_ptr<struct NativeWindowData> nativeWindowInfo(char* data, size_t sz);
+        bool activateApplication(int pid);
     };
 } // namespace Screen_Capture
 } // namespace SL

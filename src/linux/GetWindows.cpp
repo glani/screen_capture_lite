@@ -298,6 +298,9 @@ namespace Screen_Capture {
         return res;
     }
 
+    // macOS only: activation here goes through Activate/Topmost.
+    bool ActivateApplication(int) { return false; }
+
     std::shared_ptr<NativeWindow> NativeWindowInfo(char* data, const size_t sz) {
         NativeWindow windowInfo;
         u_int32_t* wId = (u_int32_t *)data;

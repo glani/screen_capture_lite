@@ -184,6 +184,8 @@ namespace SL {
             return resultPtr;
         }
 
+        bool ActivateApplication(int pid) { return ptrWrapper.activateApplication(pid); }
+
         std::shared_ptr<NativeWindow> NativeWindowInfo(char *data, const size_t sz) {
             std::shared_ptr<NativeWindow> windowPtr = std::make_shared<NativeWindow>();
             std::shared_ptr<NativeWindowData> window = ptrWrapper.nativeWindowInfo(data, sz);

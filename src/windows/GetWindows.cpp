@@ -638,9 +638,13 @@ namespace SL {
             return nullptr;
         }
 
+        // macOS only: activation here goes through Activate/Topmost.
+        bool ActivateApplication(int) { return false; }
+
         // Native window info: data is what Electron's BrowserWindow.getNativeWindowHandle() returns, the HWND
         // (sizeof(HWND) bytes). Linux reads the X window id the same way; macOS turns an NSView* into the window number.
         // Handle = the HWND, OwnerHandle = its process id (as getWindow reports them). It returned nullptr before.
+
         std::shared_ptr<NativeWindow> NativeWindowInfo(char *data, const size_t sz) {
             if (data == nullptr || sz < sizeof(HWND)) {
                 return nullptr;

@@ -64,6 +64,10 @@ namespace SL {
             return nativeWindowInfoWrap(this->NSWorkspaceWrapperImpl_, data, sz);
         }
 
+        bool NSWorkspaceWrapper::activateApplication(int pid) {
+            return activateApplicationWrap(this->NSWorkspaceWrapperImpl_, pid);
+        }
+
         std::shared_ptr<struct WindowData>
         NSWorkspaceWrapper::rectWindow(const WindowDataRequest &windowRequest, const CGRect &rect) {
             return rectWindowWrap(this->NSWorkspaceWrapperImpl_, windowRequest, rect);
