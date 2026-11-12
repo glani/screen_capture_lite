@@ -587,11 +587,29 @@ namespace SL {
                     ShowWindow(hwnd, SW_RESTORE);
                     ShowWindow(hwnd, SW_SHOW);
                 }
+                int x = position.X, y = position.Y, w = size.Width, h = size.Height;
                 if (IsZoomed(hwnd)) {
+                    // The caller computed the outer rect from the frame insets of the maximized window (8 px on
+                    // every side at 100 %), but SetWindowPos applies to the restored window, whose insets differ
+                    // (no top inset): shift by the difference, or a layout on a maximized window lands a border
+                    // off (seen 2026-11-12: frame 1279,512 642x529 for the bottom right sixth 1280,520 640x520).
+                    RECT r0{}, f0{};
+                    const bool before = GetWindowRect(hwnd, &r0) &&
+                                        SUCCEEDED(DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &f0, sizeof(f0)));
                     ShowWindow(hwnd, SW_RESTORE);
+                    RECT r1{}, f1{};
+                    if (before && GetWindowRect(hwnd, &r1) &&
+                        SUCCEEDED(DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &f1, sizeof(f1)))) {
+                        const int l0 = f0.left - r0.left, t0 = f0.top - r0.top, rr0 = r0.right - f0.right, b0 = r0.bottom - f0.bottom;
+                        const int l1 = f1.left - r1.left, t1 = f1.top - r1.top, rr1 = r1.right - f1.right, b1 = r1.bottom - f1.bottom;
+                        x += l0 - l1;
+                        y += t0 - t1;
+                        w += (l1 + rr1) - (l0 + rr0);
+                        h += (t1 + b1) - (t0 + b0);
+                    }
                 }
 
-                SetWindowPos(hwnd, nullptr, position.X, position.Y, size.Width, size.Height, SWP_NOZORDER);
+                SetWindowPos(hwnd, nullptr, x, y, w, h, SWP_NOZORDER);
                 auto monitors = GetMonitors();
                 return getWindow(hwnd, windowRequest.RetrieveIcons, monitors.get());
             }
