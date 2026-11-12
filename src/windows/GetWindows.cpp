@@ -1092,8 +1092,14 @@ namespace SL {
             if (!::IsWindowVisible(hwnd)) {
                 return true;
             }
+            wchar_t class_name[MAX_PATH] = {0};
+            const bool has_class = ::GetClassNameW(hwnd, class_name, MAX_PATH) > 0;
+            // A classic console window (conhost: cmd, PowerShell, any console program) is WS_EX_LAYERED, for its
+            // opacity setting, yet an ordinary app window that Alt+Tab lists: keep it. Without this SMBAct could
+            // neither list nor place a console (ex style 0x000C0110 on Windows 10 22H2, 2026-11-12).
+            const bool console = has_class && lstrcmpiW(class_name, L"ConsoleWindowClass") == 0;
             const DWORD kExcludedStyles = WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW |
-                                          WS_EX_COMPOSITED | WS_EX_LAYERED;
+                                          WS_EX_COMPOSITED | (console ? 0 : WS_EX_LAYERED);
             const DWORD kAllowedStyles =
                     WS_CHILD | WS_POPUP | WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU |
                     WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME;
@@ -1104,8 +1110,7 @@ namespace SL {
                 return true;
             }
             // Filter out windows that have certain class names.
-            wchar_t class_name[MAX_PATH] = {0};
-            if (::GetClassNameW(hwnd, class_name, MAX_PATH) &&
+            if (has_class &&
                 (lstrcmpiW(class_name, L"WorkerW") == 0 ||
                  lstrcmpiW(class_name, L"Progman") == 0)) {
                 return true;
