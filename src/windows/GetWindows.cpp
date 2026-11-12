@@ -15,6 +15,9 @@
 #include <shellapi.h>
 #include <ShlObj.h>
 #include <ShlDisp.h>
+#include <propidl.h>
+#include <propsys.h>
+#include <shobjidl.h>
 #include "internal/SCShared.h"
 #include <UIAutomation.h>
 #include <wrl/client.h>
@@ -69,6 +72,7 @@ namespace SL {
         std::vector<std::string> splitString(const std::string &str, char delimiter);
 
         std::shared_ptr<std::pair<HICON, HICON>> retrieveIcon(HANDLE hProcess);
+        std::shared_ptr<std::string> retrieveShellAppIcon(HWND hwnd, HANDLE hProcess);
 
         std::shared_ptr<Window> getWindow(const HWND &hwnd, bool retrieveIcon, const std::vector<Monitor> *monitors);
 
@@ -848,10 +852,24 @@ namespace SL {
                 // destroyed here; DestroyIcon on it destroyed the icon of SMBAct's own windows.
                 DWORD_PTR iconResult = 0;
                 HICON hIcon = NULL;
-                if (SendMessageTimeout(hwnd, WM_GETICON, ICON_BIG, 0, SMTO_ABORTIFHUNG, 100, &iconResult)) {
+                // The app's icon through the Shell first (retrieveShellAppIcon); only icons are asked for, so the
+                // Shell call is skipped when they are not.
+                std::shared_ptr<std::string> appIcon = retrieveIcons ? retrieveShellAppIcon(hwnd, hProcess) : nullptr;
+                if (appIcon) {
+                    WindowAttribute attributeIcon;
+                    attributeIcon.Code = std::string(S_RES_ICON_URL);
+                    attributeIcon.Value = *appIcon;
+                    w.Attributes.emplace_back(attributeIcon);
+                    WindowAttribute attributeIconExist;
+                    attributeIconExist.Code = std::string(S_RES_ICON_EXIST);
+                    attributeIconExist.Value = S_TRUE;
+                    w.Attributes.emplace_back(attributeIconExist);
+                } else if (SendMessageTimeout(hwnd, WM_GETICON, ICON_BIG, 0, SMTO_ABORTIFHUNG, 100, &iconResult)) {
                     hIcon = reinterpret_cast<HICON>(iconResult);
                 }
-                if (hIcon != NULL) {
+                if (appIcon) {
+                    // done above
+                } else if (hIcon != NULL) {
                     fillIconsIfNeeded(w, hIcon, retrieveIcons);
                 } else {
                     auto icons = retrieveIcon(hProcess);
@@ -1083,6 +1101,70 @@ namespace SL {
             }
 
             return result;
+        }
+
+        // The app's own icon, as Alt+Tab shows it, 256 px, through the Shell: the window's AppUserModelID first (a UWP
+        // app's frame, ApplicationFrameHost, carries its app's AUMID; the frame host's executable only has a generic
+        // window icon), then the executable. Null when neither gives one; then WM_GETICON and ExtractIconEx as before.
+        // The window's own icon is no longer first: Chrome hands out the page's favicon (a grey globe for a local file)
+        // and such icons are 32 px, blurry on a switcher card (seen 2026-11-12).
+        static std::shared_ptr<std::string> shellItemIcon(IShellItem *item) {
+            Microsoft::WRL::ComPtr<IShellItemImageFactory> factory;
+            if (FAILED(item->QueryInterface(IID_PPV_ARGS(&factory)))) {
+                return nullptr;
+            }
+            HBITMAP bitmap = NULL;
+            if (FAILED(factory->GetImage(SIZE{256, 256}, SIIGBF_ICONONLY | SIIGBF_BIGGERSIZEOK, &bitmap)) || !bitmap) {
+                return nullptr;
+            }
+            BITMAP info = {};
+            GetObject(bitmap, sizeof(info), &info);
+            HBITMAP mask = CreateBitmap(info.bmWidth, info.bmHeight, 1, 1, nullptr);
+            ICONINFO iconInfo = {TRUE, 0, 0, mask, bitmap};
+            HICON icon = mask ? CreateIconIndirect(&iconInfo) : NULL;  // the colour bitmap's alpha makes the shape
+            if (mask) {
+                DeleteObject(mask);
+            }
+            DeleteObject(bitmap);
+            if (!icon) {
+                return nullptr;
+            }
+            auto result = retrieveBase64IconData(icon);
+            DestroyIcon(icon);
+            return result;
+        }
+
+        std::shared_ptr<std::string> retrieveShellAppIcon(HWND hwnd, HANDLE hProcess) {
+            // PKEY_AppUserModel_ID and FOLDERID_AppsFolder, spelled out (no propsys / uuid link needed)
+            static const PROPERTYKEY kAppUserModelId = {{0x9F4C2855, 0x9F79, 0x4B39, {0xA8, 0xD0, 0xE1, 0xD4, 0x2D, 0xE1, 0xD5, 0xF3}}, 5};
+            static const GUID kAppsFolder = {0x1E87508D, 0x89C2, 0x42F0, {0x8A, 0x7E, 0x64, 0x5A, 0x0F, 0x50, 0xCA, 0x58}};
+            ComApartment com;  // declared first: released after the COM pointers below
+            Microsoft::WRL::ComPtr<IPropertyStore> store;
+            if (SUCCEEDED(SHGetPropertyStoreForWindow(hwnd, IID_PPV_ARGS(&store)))) {
+                PROPVARIANT value;
+                PropVariantInit(&value);
+                if (SUCCEEDED(store->GetValue(kAppUserModelId, &value)) && value.vt == VT_LPWSTR && value.pwszVal &&
+                    *value.pwszVal) {
+                    // no KF_FLAG_DONT_VERIFY: an AUMID with no Start menu entry fails here and the executable follows
+                    Microsoft::WRL::ComPtr<IShellItem> app;
+                    if (SUCCEEDED(SHCreateItemInKnownFolder(kAppsFolder, 0, value.pwszVal, IID_PPV_ARGS(&app)))) {
+                        auto icon = shellItemIcon(app.Get());
+                        if (icon) {
+                            PropVariantClear(&value);
+                            return icon;
+                        }
+                    }
+                }
+                PropVariantClear(&value);
+            }
+            wchar_t path[MAX_PATH];
+            DWORD pathSize = MAX_PATH;
+            Microsoft::WRL::ComPtr<IShellItem> exe;
+            if (hProcess && QueryFullProcessImageNameW(hProcess, 0, &path[0], &pathSize) && pathSize &&
+                SUCCEEDED(SHCreateItemFromParsingName(&path[0], nullptr, IID_PPV_ARGS(&exe)))) {
+                return shellItemIcon(exe.Get());
+            }
+            return nullptr;
         }
 
         std::shared_ptr<std::pair<HICON, HICON>> retrieveIcon(HANDLE hProcess) {
